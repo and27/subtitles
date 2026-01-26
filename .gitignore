@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+
+# builds / outputs
+dist/
+build/
+out/
+release/
+dist-electron/
+
+# tooling caches
+.vite/
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# env files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# editor/ide
+.vscode/
+.idea/
+
+# certificates / secrets
+*.pem
+*.p12
