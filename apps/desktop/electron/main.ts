@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
@@ -66,9 +66,12 @@ function createWindow() {
 }
 
 function createOverlayWindow() {
+  const bounds = screen.getPrimaryDisplay().workArea
   overlayWin = new BrowserWindow({
-    width: 900,
-    height: 220,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -94,6 +97,14 @@ function createOverlayWindow() {
 
   overlayWin.on('closed', () => {
     overlayWin = null
+  })
+
+  screen.on('display-metrics-changed', () => {
+    if (!overlayWin) {
+      return
+    }
+    const nextBounds = screen.getPrimaryDisplay().workArea
+    overlayWin.setBounds(nextBounds)
   })
 }
 
