@@ -30,6 +30,9 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
 
 let win: BrowserWindow | null
+let overlayWin: BrowserWindow | null
+
+let overlayClickThrough = true
 
 const defaultOverlayStyle: OverlayStyle = {
   opacity: 0.9,
@@ -48,6 +51,12 @@ function createWindow() {
     },
   })
 
+  win.on('closed', () => {
+    overlayWin?.close()
+    overlayWin = null
+    win = null
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
@@ -56,21 +65,54 @@ function createWindow() {
   }
 }
 
+function createOverlayWindow() {
+  overlayWin = new BrowserWindow({
+    width: 900,
+    height: 220,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  })
+
+  overlayWin.setIgnoreMouseEvents(overlayClickThrough, { forward: true })
+
+  if (VITE_DEV_SERVER_URL) {
+    const overlayUrl = new URL('overlay.html', VITE_DEV_SERVER_URL)
+    overlayWin.loadURL(overlayUrl.toString())
+  } else {
+    overlayWin.loadFile(path.join(RENDERER_DIST, 'overlay.html'))
+  }
+
+  overlayWin.on('closed', () => {
+    overlayWin = null
+  })
+}
+
 function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.overlay.show, () => {
-    // Overlay window will be wired in SUB-004.
+    overlayWin?.showInactive()
   })
   ipcMain.on(IPC_CHANNELS.overlay.hide, () => {
-    // Overlay window will be wired in SUB-004.
+    overlayWin?.hide()
   })
-  ipcMain.on(IPC_CHANNELS.overlay.updateContent, (_event, _content: OverlayContent) => {
-    // Overlay window will be wired in SUB-004.
+  ipcMain.on(IPC_CHANNELS.overlay.updateContent, (_event, content: OverlayContent) => {
+    overlayWin?.webContents.send(IPC_CHANNELS.overlay.content, content)
   })
-  ipcMain.on(IPC_CHANNELS.overlay.updateStyle, (_event, _style: Partial<OverlayStyle>) => {
-    // Overlay window will be wired in SUB-004.
+  ipcMain.on(IPC_CHANNELS.overlay.updateStyle, (_event, style: Partial<OverlayStyle>) => {
+    overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style)
   })
-  ipcMain.on(IPC_CHANNELS.overlay.setClickThrough, (_event, _enabled: boolean) => {
-    // Overlay window will be wired in SUB-004.
+  ipcMain.on(IPC_CHANNELS.overlay.setClickThrough, (_event, enabled: boolean) => {
+    overlayClickThrough = enabled
+    overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true })
   })
 
   ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
@@ -96,6 +138,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
     win = null
+    overlayWin = null
   }
 })
 
@@ -104,10 +147,12 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+    createOverlayWindow()
   }
 })
 
 app.whenReady().then(() => {
   registerIpcHandlers()
   createWindow()
+  createOverlayWindow()
 })
