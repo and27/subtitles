@@ -147,6 +147,7 @@ function App() {
     setActiveId(id)
     setDraft(toDraft(next))
     window.subtitles.scaffolds.upsert(next)
+    window.subtitles.scaffolds.setActive(id)
   }
 
   const handleSave = () => {
