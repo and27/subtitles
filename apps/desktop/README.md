@@ -28,3 +28,12 @@ export default {
 - Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
 - Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
 - Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+
+## Electron install notes (Windows)
+
+This workspace includes a `postinstall` script that forces Electron to download
+its binary during `pnpm install`. If Electron still fails to run, retry:
+
+```bash
+pnpm -C apps/desktop postinstall
+```
