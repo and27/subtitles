@@ -176,6 +176,8 @@ function App() {
       setDraft(toDraft(next))
     } else {
       setActiveId('')
+      window.subtitles.overlay.updateContent({ text: '' })
+      window.subtitles.overlay.hide()
     }
   }
 
