@@ -1,9 +1,14 @@
-import { app, BrowserWindow } from 'electron'
-import { createRequire } from 'node:module'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import {
+  IPC_CHANNELS,
+  type OverlayContent,
+  type OverlayStyle,
+  type Scaffold,
+  type AppSettings,
+} from '../ipc/contracts'
 
-const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // The built directory structure
@@ -26,17 +31,21 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+const defaultOverlayStyle: OverlayStyle = {
+  opacity: 0.9,
+  fontSize: 24,
+  lineHeight: 1.4,
+  positionY: 0.2,
+}
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
     },
-  })
-
-  // Test active push message to Renderer-process.
-  win.webContents.on('did-finish-load', () => {
-    win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
   if (VITE_DEV_SERVER_URL) {
@@ -45,6 +54,39 @@ function createWindow() {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))
   }
+}
+
+function registerIpcHandlers() {
+  ipcMain.on(IPC_CHANNELS.overlay.show, () => {
+    // Overlay window will be wired in SUB-004.
+  })
+  ipcMain.on(IPC_CHANNELS.overlay.hide, () => {
+    // Overlay window will be wired in SUB-004.
+  })
+  ipcMain.on(IPC_CHANNELS.overlay.updateContent, (_event, _content: OverlayContent) => {
+    // Overlay window will be wired in SUB-004.
+  })
+  ipcMain.on(IPC_CHANNELS.overlay.updateStyle, (_event, _style: Partial<OverlayStyle>) => {
+    // Overlay window will be wired in SUB-004.
+  })
+  ipcMain.on(IPC_CHANNELS.overlay.setClickThrough, (_event, _enabled: boolean) => {
+    // Overlay window will be wired in SUB-004.
+  })
+
+  ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
+  ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => scaffold)
+  ipcMain.handle(IPC_CHANNELS.scaffolds.delete, async () => undefined)
+  ipcMain.handle(IPC_CHANNELS.scaffolds.setActive, async () => undefined)
+
+  ipcMain.handle(
+    IPC_CHANNELS.settings.load,
+    async () =>
+      ({
+        overlayStyle: defaultOverlayStyle,
+        activeScaffoldId: null,
+      }) as AppSettings,
+  )
+  ipcMain.handle(IPC_CHANNELS.settings.save, async () => undefined)
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -65,4 +107,7 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  registerIpcHandlers()
+  createWindow()
+})
