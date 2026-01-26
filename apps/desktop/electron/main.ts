@@ -51,6 +51,12 @@ function createWindow() {
     },
   })
 
+  win.on('closed', () => {
+    overlayWin?.close()
+    overlayWin = null
+    win = null
+  })
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
