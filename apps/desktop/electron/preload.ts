@@ -1,24 +1,49 @@
-import { ipcRenderer, contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import {
+  IPC_CHANNELS,
+  type OverlayContent,
+  type OverlayStyle,
+  type Scaffold,
+  type AppSettings,
+  type SubtitlesAPI,
+} from '../ipc/contracts'
 
-// --------- Expose some API to the Renderer process ---------
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+const subtitles: SubtitlesAPI = {
+  overlay: {
+    show: () => ipcRenderer.send(IPC_CHANNELS.overlay.show),
+    hide: () => ipcRenderer.send(IPC_CHANNELS.overlay.hide),
+    updateContent: (content: OverlayContent) =>
+      ipcRenderer.send(IPC_CHANNELS.overlay.updateContent, content),
+    updateStyle: (style: Partial<OverlayStyle>) =>
+      ipcRenderer.send(IPC_CHANNELS.overlay.updateStyle, style),
+    setClickThrough: (enabled: boolean) =>
+      ipcRenderer.send(IPC_CHANNELS.overlay.setClickThrough, enabled),
   },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+  scaffolds: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.scaffolds.list),
+    upsert: (scaffold: Scaffold) =>
+      ipcRenderer.invoke(IPC_CHANNELS.scaffolds.upsert, scaffold),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.scaffolds.delete, id),
+    setActive: (id: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.scaffolds.setActive, id),
   },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
+  settings: {
+    load: () => ipcRenderer.invoke(IPC_CHANNELS.settings.load),
+    save: (settings: AppSettings) =>
+      ipcRenderer.invoke(IPC_CHANNELS.settings.save, settings),
   },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+  onOverlayContent: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, content: OverlayContent) =>
+      listener(content)
+    ipcRenderer.on(IPC_CHANNELS.overlay.content, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.content, handler)
   },
+  onOverlayStyle: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, style: Partial<OverlayStyle>) =>
+      listener(style)
+    ipcRenderer.on(IPC_CHANNELS.overlay.style, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.style, handler)
+  },
+}
 
-  // You can expose other APTs you need here.
-  // ...
-})
+contextBridge.exposeInMainWorld('subtitles', subtitles)
