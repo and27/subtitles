@@ -100,6 +100,15 @@ This is a support tool, not a performance optimizer.
 
 Subtitles follows **Clean Architecture + Hexagonal Architecture** principles.
 
+## Workspace layout
+
+This repository is a pnpm workspace (see `pnpm-workspace.yaml`) with:
+
+- `apps/desktop` — Electron app (main, preload, renderer)
+- `packages/core` — domain + application core (framework-agnostic)
+- `packages/infra` — adapters (storage, IPC, Electron)
+- `docs` — roadmap and documentation
+
 ## Architecture layers
 
 apps/desktop
