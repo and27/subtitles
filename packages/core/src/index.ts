@@ -1,0 +1,5 @@
+export type { DomainIssue, DomainResult } from './domain/validation'
+export type { AnswerScaffold, AnswerScaffoldInput } from './domain/answerScaffold'
+export { normalizeAnswerScaffold, validateAnswerScaffold } from './domain/answerScaffold'
+export type { OverlayStyle } from './domain/overlayStyle'
+export { DEFAULT_OVERLAY_STYLE, normalizeOverlayStyle, validateOverlayStyle } from './domain/overlayStyle'
