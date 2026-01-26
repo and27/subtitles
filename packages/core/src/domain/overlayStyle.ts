@@ -27,16 +27,24 @@ export const normalizeOverlayStyle = (input: Partial<OverlayStyle>): OverlayStyl
 export const validateOverlayStyle = (input: OverlayStyle): DomainResult<OverlayStyle> => {
   const issues: DomainIssue[] = []
 
-  if (input.opacity < 0 || input.opacity > 1) {
+  if (!Number.isFinite(input.opacity)) {
+    issues.push({ field: 'opacity', message: 'opacity must be a finite number' })
+  } else if (input.opacity < 0 || input.opacity > 1) {
     issues.push({ field: 'opacity', message: 'opacity must be between 0 and 1' })
   }
-  if (input.fontSize < 12 || input.fontSize > 72) {
+  if (!Number.isFinite(input.fontSize)) {
+    issues.push({ field: 'fontSize', message: 'fontSize must be a finite number' })
+  } else if (input.fontSize < 12 || input.fontSize > 72) {
     issues.push({ field: 'fontSize', message: 'fontSize must be between 12 and 72' })
   }
-  if (input.lineHeight < 1 || input.lineHeight > 2) {
+  if (!Number.isFinite(input.lineHeight)) {
+    issues.push({ field: 'lineHeight', message: 'lineHeight must be a finite number' })
+  } else if (input.lineHeight < 1 || input.lineHeight > 2) {
     issues.push({ field: 'lineHeight', message: 'lineHeight must be between 1 and 2' })
   }
-  if (input.positionY < 0 || input.positionY > 1) {
+  if (!Number.isFinite(input.positionY)) {
+    issues.push({ field: 'positionY', message: 'positionY must be a finite number' })
+  } else if (input.positionY < 0 || input.positionY > 1) {
     issues.push({ field: 'positionY', message: 'positionY must be between 0 and 1' })
   }
 
