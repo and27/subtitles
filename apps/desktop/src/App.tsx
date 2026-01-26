@@ -1,34 +1,373 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/electron-vite.animate.svg'
+import { useEffect, useMemo, useState } from 'react'
+import type { OverlayStyle, Scaffold } from '../ipc/contracts'
 import './App.css'
 
+type ScaffoldDraft = {
+  id: string
+  triggersText: string
+  structureText: string
+  startersText: string
+  tagsText: string
+}
+
+const DEFAULT_STYLE: OverlayStyle = {
+  opacity: 0.9,
+  fontSize: 24,
+  lineHeight: 1.4,
+  positionY: 0.2,
+}
+
+const seedScaffolds: Scaffold[] = [
+  {
+    id: 'scaffold-intro',
+    triggers: ['Tell me about yourself', 'Introduce yourself'],
+    structure: ['Present role + scope', 'Relevant past experience', 'Why this role now'],
+    starterPhrases: ['Sure—quick overview:', 'In my current role...'],
+    tags: ['intro'],
+  },
+  {
+    id: 'scaffold-challenge',
+    triggers: ['Challenge you overcame', 'Difficult situation'],
+    structure: ['Context', 'Action', 'Result', 'Learning'],
+    starterPhrases: ['Here is one example:', 'What I learned was...'],
+    tags: ['story'],
+  },
+]
+
+const parseLines = (value: string) =>
+  value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const parseTags = (value: string) =>
+  value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const toDraft = (scaffold: Scaffold): ScaffoldDraft => ({
+  id: scaffold.id,
+  triggersText: scaffold.triggers.join('\n'),
+  structureText: scaffold.structure.join('\n'),
+  startersText: scaffold.starterPhrases.join('\n'),
+  tagsText: scaffold.tags?.join(', ') ?? '',
+})
+
+const fromDraft = (draft: ScaffoldDraft): Scaffold => ({
+  id: draft.id,
+  triggers: parseLines(draft.triggersText),
+  structure: parseLines(draft.structureText),
+  starterPhrases: parseLines(draft.startersText),
+  tags: parseTags(draft.tagsText),
+})
+
+const scaffoldTitle = (scaffold: Scaffold) =>
+  scaffold.triggers[0] ?? scaffold.tags?.[0] ?? 'Untitled scaffold'
+
+const buildOverlayText = (scaffold: Scaffold) => {
+  const lines: string[] = []
+
+  if (scaffold.structure.length > 0) {
+    lines.push(scaffold.structure.map((item) => `• ${item}`).join('\n'))
+  }
+  if (scaffold.starterPhrases.length > 0) {
+    lines.push(scaffold.starterPhrases.join('\n'))
+  }
+
+  return lines.join('\n\n') || 'Add structure or starter phrases to display here.'
+}
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [scaffolds, setScaffolds] = useState<Scaffold[]>(seedScaffolds)
+  const [activeId, setActiveId] = useState<string>(seedScaffolds[0]?.id ?? '')
+  const [draft, setDraft] = useState<ScaffoldDraft>(() =>
+    seedScaffolds[0] ? toDraft(seedScaffolds[0]) : toDraft({
+      id: 'scaffold-new',
+      triggers: [],
+      structure: [],
+      starterPhrases: [],
+      tags: [],
+    }),
+  )
+  const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE)
+  const [overlayVisible, setOverlayVisible] = useState(true)
+
+  const activeDraft = useMemo(() => fromDraft(draft), [draft])
+
+  useEffect(() => {
+    const active = scaffolds.find((item) => item.id === activeId)
+    if (active) {
+      setDraft(toDraft(active))
+    }
+  }, [activeId, scaffolds])
+
+  useEffect(() => {
+    window.subtitles.scaffolds.list().then((items) => {
+      if (items.length > 0) {
+        setScaffolds(items)
+        setActiveId(items[0]?.id ?? '')
+      }
+    })
+    window.subtitles.settings.load().then((settings) => {
+      setOverlayStyle(settings.overlayStyle)
+      if (settings.activeScaffoldId) {
+        setActiveId(settings.activeScaffoldId)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    window.subtitles.overlay.updateStyle(overlayStyle)
+  }, [overlayStyle])
+
+  useEffect(() => {
+    if (!activeId) {
+      return
+    }
+    const content = buildOverlayText(activeDraft)
+    window.subtitles.overlay.updateContent({ text: content })
+    if (overlayVisible) {
+      window.subtitles.overlay.show()
+    } else {
+      window.subtitles.overlay.hide()
+    }
+  }, [activeDraft, activeId, overlayVisible])
+
+  const handleCreate = () => {
+    const id = crypto.randomUUID?.() ?? `scaffold-${Date.now()}`
+    const next = {
+      id,
+      triggers: [],
+      structure: [],
+      starterPhrases: [],
+      tags: [],
+    }
+    setScaffolds((prev) => [next, ...prev])
+    setActiveId(id)
+    setDraft(toDraft(next))
+    window.subtitles.scaffolds.upsert(next)
+  }
+
+  const handleSave = () => {
+    const scaffold = activeDraft
+    setScaffolds((prev) => {
+      const exists = prev.some((item) => item.id === scaffold.id)
+      if (!exists) {
+        return [scaffold, ...prev]
+      }
+      return prev.map((item) => (item.id === scaffold.id ? scaffold : item))
+    })
+    setActiveId(scaffold.id)
+    window.subtitles.scaffolds.upsert(scaffold)
+  }
+
+  const handleDelete = () => {
+    if (!activeId) {
+      return
+    }
+    const remaining = scaffolds.filter((item) => item.id !== activeId)
+    setScaffolds(remaining)
+    window.subtitles.scaffolds.delete(activeId)
+    const next = remaining[0]
+    if (next) {
+      setActiveId(next.id)
+      setDraft(toDraft(next))
+    } else {
+      setActiveId('')
+    }
+  }
+
+  const handleSelect = (id: string) => {
+    setActiveId(id)
+    window.subtitles.scaffolds.setActive(id)
+  }
+
+  const handleStyleChange = (patch: Partial<OverlayStyle>) => {
+    setOverlayStyle((prev) => ({ ...prev, ...patch }))
+  }
 
   return (
-    <>
-      <div>
-        <a href="https://electron-vite.github.io" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="app-shell">
+      <header className="app-header">
+        <div>
+          <p className="eyebrow">Control Window</p>
+          <h1>Subtitles Studio</h1>
+          <p className="subtitle">
+            Calm scaffolds for live conversations. Keep it clear, short, and accessible.
+          </p>
+        </div>
+        <div className="header-actions">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={overlayVisible}
+              onChange={(event) => setOverlayVisible(event.target.checked)}
+            />
+            <span>Overlay visible</span>
+          </label>
+          <button className="primary" type="button" onClick={handleCreate}>
+            New scaffold
+          </button>
+        </div>
+      </header>
+
+      <main className="app-grid">
+        <section className="panel list-panel" aria-label="Scaffold list">
+          <div className="panel-header">
+            <h2>Scaffolds</h2>
+            <p>Pick one to edit or create a new pattern.</p>
+          </div>
+          <div className="scaffold-list" role="listbox" aria-label="Available scaffolds">
+            {scaffolds.map((scaffold) => (
+              <button
+                key={scaffold.id}
+                type="button"
+                className={`scaffold-item ${scaffold.id === activeId ? 'is-active' : ''}`}
+                onClick={() => handleSelect(scaffold.id)}
+              >
+                <span className="scaffold-title">{scaffoldTitle(scaffold)}</span>
+                <span className="scaffold-meta">
+                  {scaffold.triggers.length} triggers · {scaffold.structure.length} bullets
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel editor-panel">
+          <div className="panel-header">
+            <h2>Scaffold editor</h2>
+            <p>Edit the active scaffold. One item per line.</p>
+          </div>
+
+          <form className="editor-form" onSubmit={(event) => event.preventDefault()}>
+            <label>
+              Trigger(s)
+              <textarea
+                rows={3}
+                value={draft.triggersText}
+                onChange={(event) =>
+                  setDraft((prev) => ({ ...prev, triggersText: event.target.value }))
+                }
+                placeholder="Tell me about yourself"
+              />
+            </label>
+
+            <label>
+              Structure (bullets)
+              <textarea
+                rows={4}
+                value={draft.structureText}
+                onChange={(event) =>
+                  setDraft((prev) => ({ ...prev, structureText: event.target.value }))
+                }
+                placeholder="Context\nAction\nResult"
+              />
+            </label>
+
+            <label>
+              Starter phrases
+              <textarea
+                rows={3}
+                value={draft.startersText}
+                onChange={(event) =>
+                  setDraft((prev) => ({ ...prev, startersText: event.target.value }))
+                }
+                placeholder="Sure—quick overview:"
+              />
+            </label>
+
+            <label>
+              Tags (comma separated)
+              <input
+                type="text"
+                value={draft.tagsText}
+                onChange={(event) => setDraft((prev) => ({ ...prev, tagsText: event.target.value }))}
+                placeholder="intro, behavioral"
+              />
+            </label>
+
+            <div className="editor-actions">
+              <button className="ghost" type="button" onClick={handleDelete} disabled={!activeId}>
+                Delete
+              </button>
+              <button className="primary" type="button" onClick={handleSave}>
+                Save changes
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel style-panel">
+          <div className="panel-header">
+            <h2>Overlay style</h2>
+            <p>Adjust for calm readability. Updates the overlay instantly.</p>
+          </div>
+
+          <div className="style-control">
+            <label htmlFor="opacity">Opacity</label>
+            <input
+              id="opacity"
+              type="range"
+              min={20}
+              max={100}
+              value={Math.round(overlayStyle.opacity * 100)}
+              onChange={(event) =>
+                handleStyleChange({ opacity: Number(event.target.value) / 100 })
+              }
+            />
+            <span>{Math.round(overlayStyle.opacity * 100)}%</span>
+          </div>
+
+          <div className="style-control">
+            <label htmlFor="fontSize">Font size</label>
+            <input
+              id="fontSize"
+              type="range"
+              min={16}
+              max={48}
+              value={overlayStyle.fontSize}
+              onChange={(event) =>
+                handleStyleChange({ fontSize: Number(event.target.value) })
+              }
+            />
+            <span>{overlayStyle.fontSize}px</span>
+          </div>
+
+          <div className="style-control">
+            <label htmlFor="lineHeight">Line height</label>
+            <input
+              id="lineHeight"
+              type="range"
+              min={1}
+              max={2}
+              step={0.05}
+              value={overlayStyle.lineHeight}
+              onChange={(event) =>
+                handleStyleChange({ lineHeight: Number(event.target.value) })
+              }
+            />
+            <span>{overlayStyle.lineHeight.toFixed(2)}</span>
+          </div>
+
+          <div className="style-control">
+            <label htmlFor="positionY">Vertical position</label>
+            <input
+              id="positionY"
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(overlayStyle.positionY * 100)}
+              onChange={(event) =>
+                handleStyleChange({ positionY: Number(event.target.value) / 100 })
+              }
+            />
+            <span>{Math.round(overlayStyle.positionY * 100)}%</span>
+          </div>
+        </section>
+      </main>
+    </div>
   )
 }
 
