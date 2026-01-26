@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Subtitles Overlay</title>
+    <style>
+      :root {
+        --overlay-font-size: 24px;
+        --overlay-line-height: 1.4;
+        --overlay-opacity: 0.9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: transparent;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: #ffffff;
+      }
+
+      #overlay-root {
+        position: fixed;
+        left: 0;
+        right: 0;
+        top: 20vh;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      #overlay-content {
+        max-width: min(900px, 90vw);
+        padding: 12px 18px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+        font-size: var(--overlay-font-size);
+        line-height: var(--overlay-line-height);
+        opacity: var(--overlay-opacity);
+        white-space: pre-wrap;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay-root">
+      <div id="overlay-content">Subtitles overlay ready</div>
+    </div>
+    <script type="module" src="/src/overlay.ts"></script>
+  </body>
+</html>
