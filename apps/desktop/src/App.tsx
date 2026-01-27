@@ -150,6 +150,13 @@ function App() {
   }, [overlayStyle])
 
   useEffect(() => {
+    if (!settingsLoaded) {
+      return
+    }
+    persistSettings()
+  }, [overlayStyle])
+
+  useEffect(() => {
     if (!activeId) {
       return
     }

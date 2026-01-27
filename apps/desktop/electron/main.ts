@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { FileScaffoldRepository, FileSettingsRepository, type StoreLogger } from 'infra'
 import {
   IPC_CHANNELS,
   type AudioCaptureMode,
@@ -57,6 +58,41 @@ let listeningState: ListeningState = {
 }
 let registeredHotkey: string | null = null
 let overlayVisibilityBeforeListening: boolean | null = null
+
+let scaffoldRepository: FileScaffoldRepository | null = null
+let settingsRepository: FileSettingsRepository | null = null
+
+const storeLogger: StoreLogger = {
+  warn: (message: string) => {
+    console.warn(`[storage] ${message}`)
+  },
+}
+
+const getStorePath = () => path.join(app.getPath('userData'), 'subtitles-store.json')
+
+const ensureRepositories = () => {
+  if (!scaffoldRepository || !settingsRepository) {
+    const storePath = getStorePath()
+    scaffoldRepository = new FileScaffoldRepository(storePath, storeLogger)
+    settingsRepository = new FileSettingsRepository(storePath, storeLogger)
+  }
+}
+
+const hydrateAppSettings = async () => {
+  ensureRepositories()
+  if (!settingsRepository) {
+    return
+  }
+  const persisted = await settingsRepository.load()
+  appSettings = {
+    ...appSettings,
+    ...persisted,
+  }
+  listeningState = {
+    ...listeningState,
+    audioMode: appSettings.audioMode,
+  }
+}
 
 const broadcastListeningState = () => {
   win?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
@@ -221,19 +257,69 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.listening.toggle, () => toggleListening('ui'))
   ipcMain.handle(IPC_CHANNELS.listening.getState, async () => listeningState)
 
-  ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
-  ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => scaffold)
-  ipcMain.handle(IPC_CHANNELS.scaffolds.delete, async () => undefined)
-  ipcMain.handle(IPC_CHANNELS.scaffolds.setActive, async () => undefined)
+  ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => {
+    ensureRepositories()
+    if (!scaffoldRepository) {
+      return [] as Scaffold[]
+    }
+    return scaffoldRepository.list()
+  })
+  ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => {
+    ensureRepositories()
+    if (!scaffoldRepository) {
+      return scaffold
+    }
+    return scaffoldRepository.upsert(scaffold)
+  })
+  ipcMain.handle(IPC_CHANNELS.scaffolds.delete, async (_event, id: string) => {
+    ensureRepositories()
+    if (!scaffoldRepository) {
+      return
+    }
+    await scaffoldRepository.delete(id)
+  })
+  ipcMain.handle(IPC_CHANNELS.scaffolds.setActive, async (_event, id: string) => {
+    ensureRepositories()
+    if (!scaffoldRepository) {
+      return
+    }
+    await scaffoldRepository.setActiveId(id)
+  })
 
-  ipcMain.handle(
-    IPC_CHANNELS.settings.load,
-    async () => appSettings,
-  )
+  ipcMain.handle(IPC_CHANNELS.settings.load, async () => {
+    ensureRepositories()
+    if (settingsRepository) {
+      const settings = await settingsRepository.load()
+      appSettings = {
+        ...appSettings,
+        ...settings,
+      }
+    }
+    const activeScaffoldId = scaffoldRepository
+      ? await scaffoldRepository.getActiveId()
+      : appSettings.activeScaffoldId
+    appSettings = {
+      ...appSettings,
+      activeScaffoldId,
+    }
+    return appSettings
+  })
   ipcMain.handle(IPC_CHANNELS.settings.save, async (_event, next: AppSettings) => {
     const prevHotkey = appSettings.hotkey
     const prevAudioMode = appSettings.audioMode
     appSettings = { ...appSettings, ...next }
+
+    ensureRepositories()
+    if (settingsRepository) {
+      await settingsRepository.save({
+        overlayStyle: appSettings.overlayStyle,
+        audioMode: appSettings.audioMode,
+        hotkey: appSettings.hotkey,
+      })
+    }
+    if (scaffoldRepository) {
+      await scaffoldRepository.setActiveId(appSettings.activeScaffoldId)
+    }
 
     if (appSettings.hotkey !== prevHotkey) {
       registerGlobalHotkey()
@@ -264,7 +350,8 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  await hydrateAppSettings()
   registerIpcHandlers()
   createWindow()
   createOverlayWindow()

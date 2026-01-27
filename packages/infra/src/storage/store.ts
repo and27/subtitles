@@ -12,6 +12,8 @@ const createDefaultStore = (): StoreData => ({
   scaffolds: [],
   activeScaffoldId: null,
   overlayStyle: { ...DEFAULT_OVERLAY_STYLE },
+  audioMode: 'system',
+  hotkey: 'CommandOrControl+Shift+Space',
 })
 
 const storeQueue = new Map<string, Promise<unknown>>()

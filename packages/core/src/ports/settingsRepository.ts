@@ -1,7 +1,11 @@
 import type { OverlayStyle } from '../domain/overlayStyle'
 
+export type AudioCaptureMode = 'mic' | 'system' | 'mixed'
+
 export type AppSettings = {
   overlayStyle: OverlayStyle
+  audioMode?: AudioCaptureMode
+  hotkey?: string
 }
 
 export interface SettingsRepositoryPort {
