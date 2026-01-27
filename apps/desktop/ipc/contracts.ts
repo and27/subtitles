@@ -38,6 +38,8 @@ export type OverlayStyle = {
   positionY: number
 }
 
+export type AudioCaptureMode = 'mic' | 'system' | 'mixed'
+
 export type Scaffold = {
   id: string
   triggers: string[]
@@ -50,11 +52,13 @@ export type AppSettings = {
   overlayStyle: OverlayStyle
   activeScaffoldId: string | null
   hotkey: string
+  audioMode: AudioCaptureMode
 }
 
 export type ListeningState = {
   active: boolean
   source?: 'hotkey' | 'ui'
+  audioMode: AudioCaptureMode
 }
 
 export type Unsubscribe = () => void
