@@ -137,6 +137,7 @@ function App() {
   const [transcriptDraft, setTranscriptDraft] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [scaffoldsLoaded, setScaffoldsLoaded] = useState(false);
+  const [storedActiveId, setStoredActiveId] = useState<string | null>(null);
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft]);
 
@@ -151,14 +152,24 @@ function App() {
     window.subtitles.scaffolds.list().then((items) => {
       if (items.length > 0) {
         setScaffolds(items);
-        setActiveId(items[0]?.id ?? "");
+        const preferredId =
+          storedActiveId && items.some((item) => item.id === storedActiveId)
+            ? storedActiveId
+            : items[0]?.id ?? "";
+        setActiveId(preferredId);
       }
       setScaffoldsLoaded(true);
     });
     window.subtitles.settings.load().then((settings) => {
       setOverlayStyle(settings.overlayStyle);
       if (settings.activeScaffoldId) {
-        setActiveId(settings.activeScaffoldId);
+        setStoredActiveId(settings.activeScaffoldId);
+        if (
+          scaffoldsLoaded &&
+          scaffolds.some((item) => item.id === settings.activeScaffoldId)
+        ) {
+          setActiveId(settings.activeScaffoldId);
+        }
       }
       setAudioMode(settings.audioMode ?? DEFAULT_AUDIO_MODE);
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY);
@@ -195,8 +206,11 @@ function App() {
     if (!settingsLoaded || !scaffoldsLoaded) {
       return;
     }
+    if (storedActiveId && activeId !== storedActiveId) {
+      return;
+    }
     persistSettings();
-  }, [overlayStyle, settingsLoaded, scaffoldsLoaded]);
+  }, [overlayStyle, settingsLoaded, scaffoldsLoaded, activeId, storedActiveId]);
 
   useEffect(() => {
     if (!activeId) {
