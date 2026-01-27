@@ -3,6 +3,8 @@ export type { AnswerScaffold, AnswerScaffoldInput } from './domain/answerScaffol
 export { normalizeAnswerScaffold, validateAnswerScaffold } from './domain/answerScaffold'
 export type { OverlayStyle } from './domain/overlayStyle'
 export { DEFAULT_OVERLAY_STYLE, normalizeOverlayStyle, validateOverlayStyle } from './domain/overlayStyle'
+export type { Intent } from './domain/intent'
+export { classifyIntent } from './domain/intent'
 export type { OverlayPort } from './ports/overlayPort'
 export type { ScaffoldRepositoryPort } from './ports/scaffoldRepository'
 export type { AppSettings, SettingsRepositoryPort } from './ports/settingsRepository'

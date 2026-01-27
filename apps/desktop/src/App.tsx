@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { generateAnswerHints } from "core";
 import type {
   AppSettings,
   AudioCaptureMode,
@@ -82,7 +83,11 @@ const fromDraft = (draft: ScaffoldDraft): Scaffold => ({
 const scaffoldTitle = (scaffold: Scaffold) =>
   scaffold.triggers[0] ?? scaffold.tags?.[0] ?? "Untitled scaffold";
 
-const buildOverlayText = (scaffold: Scaffold, transcript: string) => {
+const buildOverlayText = (
+  scaffold: Scaffold,
+  transcript: string,
+  hints: string[],
+) => {
   const lines: string[] = [];
 
   if (transcript) {
@@ -94,6 +99,10 @@ const buildOverlayText = (scaffold: Scaffold, transcript: string) => {
   }
   if (scaffold.starterPhrases.length > 0) {
     lines.push(scaffold.starterPhrases.join("\n"));
+  }
+
+  if (hints.length > 0) {
+    lines.push(`Hints:\n${hints.map((hint) => `• ${hint}`).join("\n")}`);
   }
 
   return (
@@ -141,6 +150,10 @@ function App() {
   const [storedActiveId, setStoredActiveId] = useState<string | null>(null);
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft]);
+  const hints = useMemo(
+    () => generateAnswerHints(transcript.text, activeDraft, { maxHints: 3 }),
+    [transcript.text, activeDraft],
+  );
 
   useEffect(() => {
     const active = scaffolds.find((item) => item.id === activeId);
@@ -225,7 +238,7 @@ function App() {
     if (!activeId) {
       return;
     }
-    const content = buildOverlayText(activeDraft, transcript.text);
+    const content = buildOverlayText(activeDraft, transcript.text, hints);
     window.subtitles.overlay.updateContent({ text: content });
     const shouldShowOverlay = overlayVisible || listeningState.active;
     if (shouldShowOverlay) {
@@ -239,6 +252,7 @@ function App() {
     overlayVisible,
     listeningState.active,
     transcript.text,
+    hints,
   ]);
 
   const handleCreate = () => {

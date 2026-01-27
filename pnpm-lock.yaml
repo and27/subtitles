@@ -10,6 +10,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      core:
+        specifier: workspace:*
+        version: link:../../packages/core
       infra:
         specifier: workspace:*
         version: link:../../packages/infra
