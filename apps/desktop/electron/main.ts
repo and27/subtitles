@@ -125,7 +125,7 @@ const broadcastTranscript = (text: string, isFinal: boolean) => {
   };
   win?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
   overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
-  if (appSettings.saveTranscript) {
+  if (appSettings.saveTranscript && text.trim().length > 0 && isFinal) {
     void saveTranscriptToFile(text);
   }
 };
