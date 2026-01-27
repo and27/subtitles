@@ -10,6 +10,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      infra:
+        specifier: workspace:*
+        version: link:../../packages/infra
       react:
         specifier: ^18.2.0
         version: 18.3.1
