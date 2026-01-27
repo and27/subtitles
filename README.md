@@ -1,10 +1,11 @@
 # Subtitles
 
-**Subtitles** is a desktop application that provides **live captions and presenter hints**
-to support people during live conversations, presentations, and interview practice.
+**Subtitles** is a desktop application that provides **live captions, presenter hints,
+and optional answer hints** to support people during live conversations,
+presentations, and interview practice.
 
-It is designed as a tool for **cognitive accessibility**, not as an automation or
-“answer generator”.
+It is designed as a tool for **cognitive accessibility**, not as an auto-speaker or
+hands-free automation. Answer hints are suggestions only.
 
 ---
 
@@ -22,17 +23,18 @@ without speaking for them.
 
 ---
 
-## Core concept: Answer Scaffolding
+## Core concept: Answer Scaffolding + Answer Hints
 
 Subtitles is built around the idea of **Answer Scaffolding**.
 
 > Answer scaffolding provides structure and anchors — not scripted answers.
 
-Instead of generating responses in real time, Subtitles shows:
+Subtitles can show:
 
 - Structural hints (e.g. Context → Action → Result)
 - Starter phrases
 - Personal reminders prepared in advance
+- Optional answer hints (possible responses or bullets based on intent)
 
 This helps the user **re-access their own knowledge** when under pressure.
 
@@ -52,8 +54,8 @@ This helps the user **re-access their own knowledge** when under pressure.
 
 To be explicit:
 
-- ❌ Not an auto-response tool
-- ❌ Not an interview “cheat” or copilot
+- ❌ Not an auto-sender or auto-speaker
+- ❌ Not an undetectable interview “cheat”
 - ❌ Not a system that speaks or answers on behalf of the user
 - ❌ Not undetectable automation
 
@@ -74,9 +76,11 @@ All spoken content comes from the user.
 
 ### V1 (planned)
 
-- Speech-to-text for **intent detection**, not auto-answers
+- Hotkey trigger: show overlay + start listening in one action
+- Speech-to-text (local or cloud) for **intent detection** and answer hints
 - Automatic scaffold suggestion based on question type
-- Session export (transcript, SRT/VTT)
+- Audio capture modes: mic-only, system-audio-only, or mixed
+- Optional transcript save (ephemeral by default)
 - Post-session coaching and reflection
 
 ---
@@ -147,7 +151,15 @@ without rewriting the core logic.
 - pnpm workspace
 - Local-first persistence
 - Strict IPC via preload
+- Local or cloud STT adapters (flagged)
 - No cloud dependency required
+
+---
+
+## Privacy
+
+- Audio is **ephemeral** and processed in memory by default
+- Optional transcript storage is opt-in (for evaluation or coaching)
 
 ---
 
@@ -167,6 +179,7 @@ Subtitles is the latter.
 ## Project status
 
 - Current phase: **V0 (usable practice tool)**
+- V0 foundation integrated; defining V1 live-assist scope
 - See `docs/ISSUES.md` for roadmap and implementation details.
 
 ---

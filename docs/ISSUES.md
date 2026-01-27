@@ -7,6 +7,26 @@ La arquitectura sigue principios **Clean + Hexagonal** desde el día 1.
 
 ---
 
+## Epic 1 (00x) — Foundation V0 (integrado)
+
+Estado: **finalizado e integrado**.
+Incluye: **SUB-001 → SUB-008**.
+
+## Epic 2 (10x) — Live Assist (STT + answer hints)
+
+Estado: **en definición**.
+Alcance acordado:
+
+- Windows only (por ahora)
+- Trigger por hotkey: muestra overlay + comienza a escuchar
+- Audio: mic-only, system-audio-only o mixed
+- STT local o cloud vía flag/config
+- Audio efímero por defecto; transcript opcional (opt-in)
+- Latencia near real-time como objetivo
+- Toggle en runtime para cambiar modo de audio
+
+---
+
 ## SUB-001 — Repo bootstrap + workspace
 
 ### Objetivo
@@ -346,3 +366,260 @@ Además, el formato debe permitir evolución (migraciones V0→V1).
 - [ ] Existe `schemaVersion` en el JSON
 - [ ] Migración básica preparada (aunque sea no-op en V0)
 - [ ] Errores quedan logueados sin interrumpir uso
+
+---
+
+## SUB-101 — Panic hotkey (overlay + listening)
+
+### Objetivo
+
+Un trigger rápido para momentos de estrés: un **hotkey global** que muestre el
+overlay y comience la captura de audio en un solo gesto.
+
+### Alcance
+
+- Hotkey configurable (con default razonable)
+- Toggle: start/stop listening
+- Indicador visual de estado (listening / idle)
+- Windows first, diseño cross-platform
+
+### Criterios de aceptación (DoD)
+
+- [ ] Hotkey global funciona en Windows
+- [ ] Al activar: overlay visible + audio capture ON
+- [ ] Al desactivar: audio capture OFF + overlay oculto (o estado idle)
+- [ ] Configuración persistente del hotkey
+
+## SUB-102 — Audio capture modes (mic / system / mixed)
+
+### Objetivo
+
+Capturar audio de forma flexible para escenarios reales (entrevistas, demos,
+conversaciones en apps) sin depender de una única fuente.
+
+### Alcance
+
+- Modo mic-only (voz del usuario)
+- Modo system-audio-only (audio del sistema)
+- Modo mixed (mic + sistema)
+- Port/adapter: `AudioCapturePort` en core + adapter Electron
+
+### Criterios de aceptación (DoD)
+
+- [ ] Selección de modo desde settings
+- [ ] Windows: system audio vía loopback (WASAPI)
+- [ ] Mixed sincroniza y no crashea (aunque tenga latencia extra)
+- [ ] Cambio de modo no requiere reinicio (runtime toggle)
+
+## SUB-103 — STT pipeline (local o cloud)
+
+### Objetivo
+
+Transcripción near real-time con opción local o cloud, conmutada por flag.
+
+### Alcance
+
+- Port `SttPort` en core
+- Adapter local (ej. Whisper/Vosk) y adapter cloud (ej. OpenAI/Deepgram)
+- Flag/config para elegir provider
+- Streaming por chunks (latencia baja)
+
+### Criterios de aceptación (DoD)
+
+- [ ] STT local funciona sin internet
+- [ ] STT cloud funciona con API key
+- [ ] El switch local/cloud es runtime (config)
+- [ ] El pipeline entrega texto incremental
+
+## SUB-104 — Answer hint engine (intent + scaffold + hint)
+
+### Objetivo
+
+Generar **answer hints** (borradores o bullets) a partir del transcript,
+manteniendo el enfoque de apoyo cognitivo (no autopiloto).
+
+### Alcance
+
+- Detección de intención (question type)
+- Selección de scaffold sugerido
+- Generación de 1–3 hints cortos (texto o bullets)
+- UI: overlay muestra scaffold + hints
+
+### Criterios de aceptación (DoD)
+
+- [ ] No auto-envía ni auto-habla
+- [ ] Hints cortos, legibles y opcionales
+- [ ] Scaffold + hints se actualizan en tiempo real
+
+## SUB-105 — Transcript policy (ephemeral + opt-in)
+
+### Objetivo
+
+Manejar privacidad de forma explícita: audio efímero y transcripts opt-in.
+
+### Alcance
+
+- Audio nunca se guarda
+- Transcripts se descartan por defecto
+- Opción explícita para guardar transcript (evaluación/coaching)
+- Export básico (TXT/SRT/VTT) si el usuario lo habilita
+
+### Criterios de aceptación (DoD)
+
+- [ ] Audio no se persiste
+- [ ] Guardado de transcript requiere opt-in
+- [ ] Borrado simple desde UI
+
+## SUB-106 — Latency & stability targets
+
+### Objetivo
+
+Mantener respuesta near real-time bajo carga y con audio mixed.
+
+### Alcance
+
+- Métricas simples (ms de delay, drop rate)
+- Backoff si STT falla
+- Fallback manual (input textual)
+
+### Criterios de aceptación (DoD)
+
+- [ ] Latencia objetivo configurada
+- [ ] App no se bloquea ante fallos STT
+- [ ] Fallback manual disponible
+
+---
+
+SUB-009 — Answer Scaffold Engine (matching básico)
+Objetivo
+
+Implementar un motor simple que seleccione el scaffold correcto
+basado en intención (no contenido exacto).
+
+Alcance
+
+Matching por:
+
+triggers (keywords)
+
+tags
+
+Prioridad simple (primer match válido)
+
+Input manual o transcript STT
+
+DoD
+
+Dado un input textual, devuelve 0–1 scaffold
+
+No genera texto nuevo
+
+Solo devuelve estructura + starters
+
+Vive en packages/core
+
+SUB-010 — Manual “question intake” (practice mode)
+Objetivo
+
+Permitir practicar entrevistas sin STT:
+el usuario escribe o pega una pregunta
+y el sistema responde con scaffolding visual.
+
+Alcance
+
+Input manual en ControlWindow
+
+Botón “Practice”
+
+Overlay muestra scaffold sugerido
+
+DoD
+
+Flujo completo sin audio
+
+Overlay se actualiza correctamente
+
+No requiere STT (funciona como fallback)
+
+SUB-011 — Cognitive modes (visual safety)
+Objetivo
+
+Reducir sobrecarga cognitiva con modos visuales predefinidos.
+
+Alcance
+
+Modos:
+
+Calm
+
+Minimal
+
+Focus
+
+Cada modo ajusta:
+
+opacidad
+
+tamaño
+
+cantidad de líneas visibles
+
+DoD
+
+Cambiar modo es instantáneo
+
+Overlay responde en tiempo real
+
+Persisten entre sesiones
+
+SUB-012 — Anxiety-friendly flow (no-decision mode)
+Objetivo
+
+Reducir decisiones bajo estrés.
+
+Alcance
+
+Un solo botón: “Help me start”
+
+Muestra:
+
+1 starter phrase
+
+1 structure line
+
+Sin scroll
+
+Sin listas largas
+
+DoD
+
+Flujo usable con 1 click
+
+No muestra más de 2–3 elementos
+
+Pensado para freeze moments
+
+SUB-013 — Session memory (local, ephemeral)
+Objetivo
+
+Recordar qué pasó sin grabar ni juzgar.
+
+Alcance
+
+Guardar:
+
+qué scaffold se usó
+
+cuándo
+
+Sin audio
+
+Sin texto completo (salvo opt-in)
+
+DoD
+
+Se puede ver resumen post-sesión
+
+Datos se pueden borrar fácilmente
+
+No hay tracking oculto
