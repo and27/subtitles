@@ -97,11 +97,6 @@ const toggleListening = (source: 'hotkey' | 'ui') => {
 }
 
 const registerGlobalHotkey = () => {
-  if (registeredHotkey) {
-    globalShortcut.unregister(registeredHotkey)
-    registeredHotkey = null
-  }
-
   if (!appSettings.hotkey) {
     return
   }
@@ -115,6 +110,9 @@ const registerGlobalHotkey = () => {
     return
   }
 
+  if (registeredHotkey && registeredHotkey !== appSettings.hotkey) {
+    globalShortcut.unregister(registeredHotkey)
+  }
   registeredHotkey = appSettings.hotkey
 }
 
