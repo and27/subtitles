@@ -5,6 +5,9 @@ import type {
   ListeningState,
   OverlayStyle,
   Scaffold,
+  SttConfig,
+  SttProvider,
+  SttTranscript,
 } from '../ipc/contracts'
 import './App.css'
 
@@ -25,6 +28,7 @@ const DEFAULT_STYLE: OverlayStyle = {
 
 const DEFAULT_AUDIO_MODE: AudioCaptureMode = 'system'
 const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
+const DEFAULT_STT_PROVIDER: SttProvider = 'local'
 
 const seedScaffolds: Scaffold[] = [
   {
@@ -74,8 +78,12 @@ const fromDraft = (draft: ScaffoldDraft): Scaffold => ({
 const scaffoldTitle = (scaffold: Scaffold) =>
   scaffold.triggers[0] ?? scaffold.tags?.[0] ?? 'Untitled scaffold'
 
-const buildOverlayText = (scaffold: Scaffold) => {
+const buildOverlayText = (scaffold: Scaffold, transcript: string) => {
   const lines: string[] = []
+
+  if (transcript) {
+    lines.push(transcript)
+  }
 
   if (scaffold.structure.length > 0) {
     lines.push(scaffold.structure.map((item) => `• ${item}`).join('\n'))
@@ -104,10 +112,19 @@ function App() {
   const [audioMode, setAudioMode] = useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE)
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY)
   const [hotkeyDraft, setHotkeyDraft] = useState(DEFAULT_HOTKEY)
+  const [sttProvider, setSttProvider] = useState<SttProvider>(DEFAULT_STT_PROVIDER)
+  const [sttApiKey, setSttApiKey] = useState('')
+  const [sttConfigLoaded, setSttConfigLoaded] = useState(false)
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
   })
+  const [transcript, setTranscript] = useState<SttTranscript>({
+    text: '',
+    isFinal: true,
+    updatedAt: 0,
+  })
+  const [transcriptDraft, setTranscriptDraft] = useState('')
   const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft])
@@ -136,13 +153,24 @@ function App() {
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY)
       setSettingsLoaded(true)
     })
-    const unsubscribe = window.subtitles.onListeningState((state) => {
+    window.subtitles.stt.getConfig().then((config) => {
+      setSttProvider(config.provider ?? DEFAULT_STT_PROVIDER)
+      setSttApiKey(config.cloudApiKey ?? '')
+      setSttConfigLoaded(true)
+    })
+    const unsubscribeListening = window.subtitles.onListeningState((state) => {
       setListeningState(state)
+    })
+    const unsubscribeTranscript = window.subtitles.onSttTranscript((payload) => {
+      setTranscript(payload)
     })
     window.subtitles.listening.getState().then((state) => {
       setListeningState(state)
     })
-    return unsubscribe
+    return () => {
+      unsubscribeListening()
+      unsubscribeTranscript()
+    }
   }, [])
 
   useEffect(() => {
@@ -153,7 +181,7 @@ function App() {
     if (!activeId) {
       return
     }
-    const content = buildOverlayText(activeDraft)
+    const content = buildOverlayText(activeDraft, transcript.text)
     window.subtitles.overlay.updateContent({ text: content })
     const shouldShowOverlay = overlayVisible || listeningState.active
     if (shouldShowOverlay) {
@@ -161,7 +189,7 @@ function App() {
     } else {
       window.subtitles.overlay.hide()
     }
-  }, [activeDraft, activeId, overlayVisible, listeningState.active])
+  }, [activeDraft, activeId, overlayVisible, listeningState.active, transcript.text])
 
   const handleCreate = () => {
     const id = crypto.randomUUID?.() ?? `scaffold-${Date.now()}`
@@ -246,6 +274,26 @@ function App() {
     persistSettings({ hotkey: next })
   }
 
+  const persistSttConfig = (overrides: Partial<SttConfig> = {}) => {
+    if (!sttConfigLoaded) {
+      return
+    }
+    window.subtitles.stt.setConfig({
+      provider: sttProvider,
+      cloudApiKey: sttApiKey || undefined,
+      ...overrides,
+    })
+  }
+
+  const handleSttProviderChange = (provider: SttProvider) => {
+    setSttProvider(provider)
+    persistSttConfig({ provider })
+  }
+
+  const handleApplySttApiKey = () => {
+    persistSttConfig({ cloudApiKey: sttApiKey || undefined })
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -305,6 +353,54 @@ function App() {
               <option value="mixed">Mixed (system + mic)</option>
             </select>
             <span className="field-hint">Windows only for now. Toggle anytime.</span>
+          </label>
+          <label className="field">
+            STT provider
+            <select
+              value={sttProvider}
+              onChange={(event) => handleSttProviderChange(event.target.value as SttProvider)}
+            >
+              <option value="local">Local (offline)</option>
+              <option value="cloud">Cloud (API key)</option>
+            </select>
+            <span className="field-hint">Switches at runtime. Cloud requires an API key.</span>
+          </label>
+          <label className="field">
+            Cloud API key
+            <div className="hotkey-row">
+              <input
+                type="password"
+                value={sttApiKey}
+                onChange={(event) => setSttApiKey(event.target.value)}
+                placeholder="sk-..."
+              />
+              <button className="ghost" type="button" onClick={handleApplySttApiKey}>
+                Save
+              </button>
+            </div>
+            <span className="field-hint">Stored in memory for now.</span>
+          </label>
+          <label className="field">
+            Transcript (simulate)
+            <textarea
+              rows={3}
+              value={transcriptDraft}
+              onChange={(event) => setTranscriptDraft(event.target.value)}
+              placeholder="Paste text to simulate live captions"
+            />
+            <div className="field-actions">
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => window.subtitles.stt.simulate(transcriptDraft)}
+                disabled={!listeningState.active || transcriptDraft.trim().length === 0}
+              >
+                Send
+              </button>
+              <button className="ghost" type="button" onClick={() => window.subtitles.stt.clear()}>
+                Clear
+              </button>
+            </div>
           </label>
           <label className="field">
             Hotkey

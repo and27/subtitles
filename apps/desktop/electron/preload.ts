@@ -6,6 +6,8 @@ import {
   type Scaffold,
   type AppSettings,
   type ListeningState,
+  type SttConfig,
+  type SttTranscript,
   type SubtitlesAPI,
 } from '../ipc/contracts'
 
@@ -39,6 +41,12 @@ const subtitles: SubtitlesAPI = {
     toggle: () => ipcRenderer.send(IPC_CHANNELS.listening.toggle),
     getState: () => ipcRenderer.invoke(IPC_CHANNELS.listening.getState),
   },
+  stt: {
+    getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getConfig),
+    setConfig: (config: SttConfig) => ipcRenderer.invoke(IPC_CHANNELS.stt.setConfig, config),
+    simulate: (text: string) => ipcRenderer.send(IPC_CHANNELS.stt.simulate, text),
+    clear: () => ipcRenderer.send(IPC_CHANNELS.stt.clear),
+  },
   onOverlayContent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, content: OverlayContent) =>
       listener(content)
@@ -56,6 +64,12 @@ const subtitles: SubtitlesAPI = {
       listener(state)
     ipcRenderer.on(IPC_CHANNELS.listening.state, handler)
     return () => ipcRenderer.off(IPC_CHANNELS.listening.state, handler)
+  },
+  onSttTranscript: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, transcript: SttTranscript) =>
+      listener(transcript)
+    ipcRenderer.on(IPC_CHANNELS.stt.transcript, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.stt.transcript, handler)
   },
 }
 

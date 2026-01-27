@@ -15,6 +15,13 @@ export const IPC_CHANNELS = {
     getState: 'listening:getState',
     state: 'listening:state',
   },
+  stt: {
+    getConfig: 'stt:getConfig',
+    setConfig: 'stt:setConfig',
+    simulate: 'stt:simulate',
+    clear: 'stt:clear',
+    transcript: 'stt:transcript',
+  },
   scaffolds: {
     list: 'scaffolds:list',
     upsert: 'scaffolds:upsert',
@@ -61,11 +68,25 @@ export type ListeningState = {
   audioMode: AudioCaptureMode
 }
 
+export type SttProvider = 'local' | 'cloud'
+
+export type SttConfig = {
+  provider: SttProvider
+  cloudApiKey?: string
+}
+
+export type SttTranscript = {
+  text: string
+  isFinal: boolean
+  updatedAt: number
+}
+
 export type Unsubscribe = () => void
 
 export type OverlayContentListener = (content: OverlayContent) => void
 export type OverlayStyleListener = (style: Partial<OverlayStyle>) => void
 export type ListeningStateListener = (state: ListeningState) => void
+export type SttTranscriptListener = (transcript: SttTranscript) => void
 
 export interface SubtitlesAPI {
   overlay: {
@@ -91,7 +112,14 @@ export interface SubtitlesAPI {
     toggle: () => void
     getState: () => Promise<ListeningState>
   }
+  stt: {
+    getConfig: () => Promise<SttConfig>
+    setConfig: (config: SttConfig) => Promise<void>
+    simulate: (text: string) => void
+    clear: () => void
+  }
   onOverlayContent: (listener: OverlayContentListener) => Unsubscribe
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
   onListeningState: (listener: ListeningStateListener) => Unsubscribe
+  onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
 }

@@ -144,6 +144,16 @@
   flex: 1;
 }
 
+.field textarea {
+  resize: vertical;
+  min-height: 68px;
+}
+
+.field-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .scaffold-list {
   display: flex;
   flex-direction: column;
@@ -205,7 +215,8 @@
 .editor-form textarea,
 .editor-form input,
 .field input,
-.field select {
+.field select,
+.field textarea {
   font-family: var(--font-body);
   font-size: 0.95rem;
   border-radius: var(--radius-md);
