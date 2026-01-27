@@ -7,12 +7,12 @@ export type StoreLogger = {
   warn: (message: string) => void
 }
 
-const DEFAULT_STORE: StoreData = {
+const createDefaultStore = (): StoreData => ({
   schemaVersion: 1,
   scaffolds: [],
   activeScaffoldId: null,
-  overlayStyle: DEFAULT_OVERLAY_STYLE,
-}
+  overlayStyle: { ...DEFAULT_OVERLAY_STYLE },
+})
 
 const storeQueue = new Map<string, Promise<unknown>>()
 
@@ -40,7 +40,7 @@ const migrateStore = (data: unknown, logger?: StoreLogger): StoreData => {
     ? (data as { schemaVersion?: unknown }).schemaVersion
     : 'unknown'
   logger?.warn(`Unsupported schemaVersion (${String(version)}). Using defaults.`)
-  return { ...DEFAULT_STORE }
+  return createDefaultStore()
 }
 
 const safeParseStore = (data: unknown, logger?: StoreLogger): StoreData => {
@@ -56,7 +56,7 @@ const safeParseStore = (data: unknown, logger?: StoreLogger): StoreData => {
   const parsed = storeSchema.safeParse(data)
   if (!parsed.success) {
     logger?.warn('Invalid storage payload. Using defaults.')
-    return { ...DEFAULT_STORE }
+    return createDefaultStore()
   }
 
   return parsed.data
@@ -71,7 +71,7 @@ export const loadStore = async (filePath: string, logger?: StoreLogger): Promise
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
       logger?.warn('Failed to read storage file. Using defaults.')
     }
-    return { ...DEFAULT_STORE }
+    return createDefaultStore()
   }
 }
 
