@@ -135,6 +135,7 @@ function App() {
     updatedAt: 0,
   });
   const [transcriptDraft, setTranscriptDraft] = useState("");
+  const [saveTranscript, setSaveTranscript] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [scaffoldsLoaded, setScaffoldsLoaded] = useState(false);
   const [storedActiveId, setStoredActiveId] = useState<string | null>(null);
@@ -174,6 +175,7 @@ function App() {
       setAudioMode(settings.audioMode ?? DEFAULT_AUDIO_MODE);
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY);
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY);
+      setSaveTranscript(settings.saveTranscript ?? false);
       setSettingsLoaded(true);
     });
     window.subtitles.stt.getConfig().then((config) => {
@@ -304,6 +306,7 @@ function App() {
       activeScaffoldId: activeId || null,
       hotkey,
       audioMode,
+      saveTranscript,
       ...overrides,
     });
   };
@@ -320,6 +323,11 @@ function App() {
     }
     setHotkey(next);
     persistSettings({ hotkey: next });
+  };
+
+  const handleSaveTranscriptToggle = (enabled: boolean) => {
+    setSaveTranscript(enabled);
+    persistSettings({ saveTranscript: enabled });
   };
 
   const persistSttConfig = (overrides: Partial<SttConfig> = {}) => {
@@ -470,6 +478,26 @@ function App() {
                 onClick={() => window.subtitles.stt.clear()}
               >
                 Clear
+              </button>
+            </div>
+          </label>
+          <label className="field">
+            Save transcript (opt-in)
+            <div className="toggle">
+              <input
+                type="checkbox"
+                checked={saveTranscript}
+                onChange={(event) => handleSaveTranscriptToggle(event.target.checked)}
+              />
+              <span>Store transcript as TXT (audio is never saved)</span>
+            </div>
+            <div className="field-actions">
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => window.subtitles.transcript.clearSaved()}
+              >
+                Delete saved transcript
               </button>
             </div>
           </label>

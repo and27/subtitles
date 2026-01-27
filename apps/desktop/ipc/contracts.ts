@@ -22,6 +22,9 @@ export const IPC_CHANNELS = {
     clear: 'stt:clear',
     transcript: 'stt:transcript',
   },
+  transcript: {
+    clearSaved: 'transcript:clearSaved',
+  },
   scaffolds: {
     list: 'scaffolds:list',
     upsert: 'scaffolds:upsert',
@@ -60,6 +63,7 @@ export type AppSettings = {
   activeScaffoldId: string | null
   hotkey: string
   audioMode: AudioCaptureMode
+  saveTranscript?: boolean
 }
 
 export type ListeningState = {
@@ -117,6 +121,9 @@ export interface SubtitlesAPI {
     setConfig: (config: SttConfig) => Promise<void>
     simulate: (text: string) => void
     clear: () => void
+  }
+  transcript: {
+    clearSaved: () => void
   }
   onOverlayContent: (listener: OverlayContentListener) => Unsubscribe
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe

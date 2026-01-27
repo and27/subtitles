@@ -6,6 +6,7 @@ export type AppSettings = {
   overlayStyle: OverlayStyle
   audioMode?: AudioCaptureMode
   hotkey?: string
+  saveTranscript?: boolean
 }
 
 export interface SettingsRepositoryPort {

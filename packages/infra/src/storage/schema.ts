@@ -24,6 +24,7 @@ export const storeSchema = z.object({
   overlayStyle: overlayStyleSchema,
   audioMode: audioModeSchema,
   hotkey: z.string().default('CommandOrControl+Shift+Space'),
+  saveTranscript: z.boolean().default(false),
 })
 
 export type StoreData = z.infer<typeof storeSchema>

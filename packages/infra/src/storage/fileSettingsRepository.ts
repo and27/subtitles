@@ -17,6 +17,7 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       overlayStyle: data.overlayStyle,
       audioMode: data.audioMode,
       hotkey: data.hotkey,
+      saveTranscript: data.saveTranscript,
     }
   }
 
@@ -30,6 +31,9 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
         }
         if (settings.hotkey) {
           data.hotkey = settings.hotkey
+        }
+        if (settings.saveTranscript !== undefined) {
+          data.saveTranscript = settings.saveTranscript
         }
       },
       this.logger,
