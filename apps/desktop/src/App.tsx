@@ -238,9 +238,16 @@ function App() {
     if (!activeId) {
       return;
     }
+    const hasTranscript = transcript.text.trim().length > 0;
+    const shouldShowOverlay =
+      overlayVisible || listeningState.active || hasTranscript;
+    if (!shouldShowOverlay) {
+      window.subtitles.overlay.updateContent({ text: "" });
+      window.subtitles.overlay.hide();
+      return;
+    }
     const content = buildOverlayText(activeDraft, transcript.text, hints);
     window.subtitles.overlay.updateContent({ text: content });
-    const shouldShowOverlay = overlayVisible || listeningState.active;
     if (shouldShowOverlay) {
       window.subtitles.overlay.show();
     } else {
