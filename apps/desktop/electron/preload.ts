@@ -5,6 +5,7 @@ import {
   type OverlayStyle,
   type Scaffold,
   type AppSettings,
+  type ListeningState,
   type SubtitlesAPI,
 } from '../ipc/contracts'
 
@@ -32,6 +33,12 @@ const subtitles: SubtitlesAPI = {
     save: (settings: AppSettings) =>
       ipcRenderer.invoke(IPC_CHANNELS.settings.save, settings),
   },
+  listening: {
+    start: () => ipcRenderer.send(IPC_CHANNELS.listening.start),
+    stop: () => ipcRenderer.send(IPC_CHANNELS.listening.stop),
+    toggle: () => ipcRenderer.send(IPC_CHANNELS.listening.toggle),
+    getState: () => ipcRenderer.invoke(IPC_CHANNELS.listening.getState),
+  },
   onOverlayContent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, content: OverlayContent) =>
       listener(content)
@@ -43,6 +50,12 @@ const subtitles: SubtitlesAPI = {
       listener(style)
     ipcRenderer.on(IPC_CHANNELS.overlay.style, handler)
     return () => ipcRenderer.off(IPC_CHANNELS.overlay.style, handler)
+  },
+  onListeningState: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: ListeningState) =>
+      listener(state)
+    ipcRenderer.on(IPC_CHANNELS.listening.state, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.listening.state, handler)
   },
 }
 

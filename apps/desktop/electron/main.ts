@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
@@ -7,6 +7,7 @@ import {
   type OverlayStyle,
   type Scaffold,
   type AppSettings,
+  type ListeningState,
 } from '../ipc/contracts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -39,6 +40,80 @@ const defaultOverlayStyle: OverlayStyle = {
   fontSize: 24,
   lineHeight: 1.4,
   positionY: 0.2,
+}
+
+const defaultSettings: AppSettings = {
+  overlayStyle: defaultOverlayStyle,
+  activeScaffoldId: null,
+  hotkey: 'CommandOrControl+Shift+Space',
+}
+
+let appSettings: AppSettings = { ...defaultSettings }
+let listeningState: ListeningState = {
+  active: false,
+}
+let registeredHotkey: string | null = null
+let overlayVisibilityBeforeListening: boolean | null = null
+
+const broadcastListeningState = () => {
+  win?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
+  overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
+}
+
+const startAudioCapture = () => {
+  console.log('[audio] start capture')
+}
+
+const stopAudioCapture = () => {
+  console.log('[audio] stop capture')
+}
+
+const setListening = (active: boolean, source: 'hotkey' | 'ui') => {
+  if (listeningState.active === active) {
+    return
+  }
+
+  if (active) {
+    overlayVisibilityBeforeListening = overlayWin?.isVisible() ?? false
+    overlayWin?.showInactive()
+    startAudioCapture()
+  } else {
+    stopAudioCapture()
+    if (overlayVisibilityBeforeListening === false) {
+      overlayWin?.hide()
+    }
+    overlayVisibilityBeforeListening = null
+  }
+
+  listeningState = {
+    active,
+    source,
+  }
+  broadcastListeningState()
+}
+
+const toggleListening = (source: 'hotkey' | 'ui') => {
+  setListening(!listeningState.active, source)
+}
+
+const registerGlobalHotkey = () => {
+  if (!appSettings.hotkey) {
+    return
+  }
+
+  const success = globalShortcut.register(appSettings.hotkey, () => {
+    toggleListening('hotkey')
+  })
+
+  if (!success) {
+    console.warn(`[hotkey] failed to register: ${appSettings.hotkey}`)
+    return
+  }
+
+  if (registeredHotkey && registeredHotkey !== appSettings.hotkey) {
+    globalShortcut.unregister(registeredHotkey)
+  }
+  registeredHotkey = appSettings.hotkey
 }
 
 function createWindow() {
@@ -119,12 +194,18 @@ function registerIpcHandlers() {
     overlayWin?.webContents.send(IPC_CHANNELS.overlay.content, content)
   })
   ipcMain.on(IPC_CHANNELS.overlay.updateStyle, (_event, style: Partial<OverlayStyle>) => {
+    appSettings = { ...appSettings, overlayStyle: { ...appSettings.overlayStyle, ...style } }
     overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style)
   })
   ipcMain.on(IPC_CHANNELS.overlay.setClickThrough, (_event, enabled: boolean) => {
     overlayClickThrough = enabled
     overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true })
   })
+
+  ipcMain.on(IPC_CHANNELS.listening.start, () => setListening(true, 'ui'))
+  ipcMain.on(IPC_CHANNELS.listening.stop, () => setListening(false, 'ui'))
+  ipcMain.on(IPC_CHANNELS.listening.toggle, () => toggleListening('ui'))
+  ipcMain.handle(IPC_CHANNELS.listening.getState, async () => listeningState)
 
   ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
   ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => scaffold)
@@ -133,13 +214,16 @@ function registerIpcHandlers() {
 
   ipcMain.handle(
     IPC_CHANNELS.settings.load,
-    async () =>
-      ({
-        overlayStyle: defaultOverlayStyle,
-        activeScaffoldId: null,
-      }) as AppSettings,
+    async () => appSettings,
   )
-  ipcMain.handle(IPC_CHANNELS.settings.save, async () => undefined)
+  ipcMain.handle(IPC_CHANNELS.settings.save, async (_event, next: AppSettings) => {
+    const prevHotkey = appSettings.hotkey
+    appSettings = { ...appSettings, ...next }
+
+    if (appSettings.hotkey !== prevHotkey) {
+      registerGlobalHotkey()
+    }
+  })
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -166,4 +250,9 @@ app.whenReady().then(() => {
   registerIpcHandlers()
   createWindow()
   createOverlayWindow()
+  registerGlobalHotkey()
+})
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
 })

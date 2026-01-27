@@ -28,8 +28,27 @@
         right: 0;
         top: 20vh;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
         pointer-events: none;
+      }
+
+      #overlay-status {
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.45);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.75);
+      }
+
+      #overlay-status[data-state='listening'] {
+        color: #e8ffb0;
+        border-color: rgba(232, 255, 176, 0.5);
+        box-shadow: 0 0 18px rgba(232, 255, 176, 0.2);
       }
 
       #overlay-content {
@@ -48,6 +67,7 @@
   </head>
   <body>
     <div id="overlay-root">
+      <div id="overlay-status" data-state="idle">Idle</div>
       <div id="overlay-content">Subtitles overlay ready</div>
     </div>
     <script type="module" src="/src/overlay.ts"></script>

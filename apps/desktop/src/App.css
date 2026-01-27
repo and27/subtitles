@@ -39,6 +39,32 @@
   gap: 16px;
 }
 
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.status-badge.is-on {
+  color: #2c5f48;
+  border-color: rgba(44, 95, 72, 0.35);
+  box-shadow: 0 8px 16px rgba(44, 95, 72, 0.18);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .toggle {
   display: inline-flex;
   align-items: center;
@@ -78,6 +104,44 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.live-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.listening-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hotkey-row {
+  display: flex;
+  gap: 10px;
+}
+
+.hotkey-row input {
+  flex: 1;
 }
 
 .scaffold-list {
@@ -139,7 +203,9 @@
 }
 
 .editor-form textarea,
-.editor-form input {
+.editor-form input,
+.field input,
+.field select {
   font-family: var(--font-body);
   font-size: 0.95rem;
   border-radius: var(--radius-md);
