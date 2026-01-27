@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+const audioModeSchema = z.enum(['mic', 'system', 'mixed']).default('system')
+
 const overlayStyleSchema = z.object({
   opacity: z.number(),
   fontSize: z.number(),
@@ -20,6 +22,8 @@ export const storeSchema = z.object({
   scaffolds: z.array(scaffoldSchema),
   activeScaffoldId: z.string().nullable(),
   overlayStyle: overlayStyleSchema,
+  audioMode: audioModeSchema,
+  hotkey: z.string().default('CommandOrControl+Shift+Space'),
 })
 
 export type StoreData = z.infer<typeof storeSchema>

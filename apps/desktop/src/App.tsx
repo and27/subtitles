@@ -213,6 +213,13 @@ function App() {
   }, [overlayStyle, settingsLoaded, scaffoldsLoaded, activeId, storedActiveId]);
 
   useEffect(() => {
+    if (!settingsLoaded) {
+      return
+    }
+    persistSettings()
+  }, [overlayStyle])
+
+  useEffect(() => {
     if (!activeId) {
       return;
     }

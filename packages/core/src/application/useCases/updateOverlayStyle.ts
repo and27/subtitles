@@ -20,7 +20,7 @@ export const updateOverlayStyle = async (
     return { ok: false, error: 'invalid_overlay_style', issues: validation.issues }
   }
 
-  await settingsRepository.save({ overlayStyle: validation.value })
+  await settingsRepository.save({ ...current, overlayStyle: validation.value })
   await overlay.updateStyle(validation.value)
 
   return { ok: true, value: validation.value }

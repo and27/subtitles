@@ -13,7 +13,11 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
 
   async load(): Promise<AppSettings> {
     const data = await loadStore(this.filePath, this.logger)
-    return { overlayStyle: data.overlayStyle }
+    return {
+      overlayStyle: data.overlayStyle,
+      audioMode: data.audioMode,
+      hotkey: data.hotkey,
+    }
   }
 
   async save(settings: AppSettings): Promise<void> {
@@ -21,6 +25,12 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       this.filePath,
       (data) => {
         data.overlayStyle = settings.overlayStyle
+        if (settings.audioMode) {
+          data.audioMode = settings.audioMode
+        }
+        if (settings.hotkey) {
+          data.hotkey = settings.hotkey
+        }
       },
       this.logger,
     )

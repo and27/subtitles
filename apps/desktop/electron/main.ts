@@ -1,6 +1,11 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
+import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import {
+  FileScaffoldRepository,
+  FileSettingsRepository,
+  type StoreLogger,
+} from "infra";
 import {
   IPC_CHANNELS,
   type AudioCaptureMode,
@@ -11,9 +16,9 @@ import {
   type ListeningState,
   type SttConfig,
   type SttTranscript,
-} from '../ipc/contracts'
+} from "../ipc/contracts";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
 //
@@ -24,195 +29,230 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // │ │ ├── main.js
 // │ │ └── preload.mjs
 // │
-process.env.APP_ROOT = path.join(__dirname, '..')
+process.env.APP_ROOT = path.join(__dirname, "..");
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, "public")
+  : RENDERER_DIST;
 
-let win: BrowserWindow | null
-let overlayWin: BrowserWindow | null
+let win: BrowserWindow | null;
+let overlayWin: BrowserWindow | null;
 
-let overlayClickThrough = true
+let overlayClickThrough = true;
 
 const defaultOverlayStyle: OverlayStyle = {
   opacity: 0.9,
   fontSize: 24,
   lineHeight: 1.4,
   positionY: 0.2,
-}
+};
 
 const defaultSettings: AppSettings = {
   overlayStyle: defaultOverlayStyle,
   activeScaffoldId: null,
-  hotkey: 'CommandOrControl+Shift+Space',
-  audioMode: 'system',
-}
+  hotkey: "CommandOrControl+Shift+Space",
+  audioMode: "system",
+};
 
-let appSettings: AppSettings = { ...defaultSettings }
+let appSettings: AppSettings = { ...defaultSettings };
 let listeningState: ListeningState = {
   active: false,
   audioMode: defaultSettings.audioMode,
-}
-let registeredHotkey: string | null = null
-let overlayVisibilityBeforeListening: boolean | null = null
+};
+let registeredHotkey: string | null = null;
+let overlayVisibilityBeforeListening: boolean | null = null;
 let sttConfig: SttConfig = {
-  provider: 'local',
-}
-let transcriptText = ''
-let transcriptTimer: NodeJS.Timeout | null = null
+  provider: "local",
+};
+let transcriptText = "";
+let transcriptTimer: NodeJS.Timeout | null = null;
+
+let scaffoldRepository: FileScaffoldRepository | null = null;
+let settingsRepository: FileSettingsRepository | null = null;
+
+const storeLogger: StoreLogger = {
+  warn: (message: string) => {
+    console.warn(`[storage] ${message}`);
+  },
+};
+
+const getStorePath = () =>
+  path.join(app.getPath("userData"), "subtitles-store.json");
+
+const ensureRepositories = () => {
+  if (!scaffoldRepository || !settingsRepository) {
+    const storePath = getStorePath();
+    scaffoldRepository = new FileScaffoldRepository(storePath, storeLogger);
+    settingsRepository = new FileSettingsRepository(storePath, storeLogger);
+  }
+};
+
+const hydrateAppSettings = async () => {
+  ensureRepositories();
+  if (!settingsRepository) {
+    return;
+  }
+  const persisted = await settingsRepository.load();
+  appSettings = {
+    ...appSettings,
+    ...persisted,
+  };
+  listeningState = {
+    ...listeningState,
+    audioMode: appSettings.audioMode,
+  };
+};
 
 const broadcastListeningState = () => {
-  win?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
-  overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
-}
+  win?.webContents.send(IPC_CHANNELS.listening.state, listeningState);
+  overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState);
+};
 
 const broadcastTranscript = (text: string, isFinal: boolean) => {
   const payload: SttTranscript = {
     text,
     isFinal,
     updatedAt: Date.now(),
-  }
-  win?.webContents.send(IPC_CHANNELS.stt.transcript, payload)
-  overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload)
-}
+  };
+  win?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
+  overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
+};
 
 const clearTranscript = () => {
-  transcriptText = ''
+  transcriptText = "";
   if (transcriptTimer) {
-    clearInterval(transcriptTimer)
-    transcriptTimer = null
+    clearInterval(transcriptTimer);
+    transcriptTimer = null;
   }
-  broadcastTranscript('', true)
-}
+  broadcastTranscript("", true);
+};
 
 const simulateTranscript = (input: string) => {
   if (!listeningState.active) {
-    return
+    return;
   }
-  const words = input
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
+  const words = input.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) {
-    clearTranscript()
-    return
+    clearTranscript();
+    return;
   }
   if (transcriptTimer) {
-    clearInterval(transcriptTimer)
-    transcriptTimer = null
+    clearInterval(transcriptTimer);
+    transcriptTimer = null;
   }
-  let index = 0
-  transcriptText = ''
+  let index = 0;
+  transcriptText = "";
   transcriptTimer = setInterval(() => {
-    transcriptText = words.slice(0, index + 1).join(' ')
-    const isFinal = index >= words.length - 1
-    broadcastTranscript(transcriptText, isFinal)
+    transcriptText = words.slice(0, index + 1).join(" ");
+    const isFinal = index >= words.length - 1;
+    broadcastTranscript(transcriptText, isFinal);
     if (isFinal && transcriptTimer) {
-      clearInterval(transcriptTimer)
-      transcriptTimer = null
+      clearInterval(transcriptTimer);
+      transcriptTimer = null;
     }
-    index += 1
-  }, 140)
-}
+    index += 1;
+  }, 140);
+};
 
 const startAudioCapture = () => {
-  console.log(`[audio] start capture (${appSettings.audioMode})`)
-}
+  console.log(`[audio] start capture (${appSettings.audioMode})`);
+};
 
 const stopAudioCapture = () => {
-  console.log('[audio] stop capture')
-}
+  console.log("[audio] stop capture");
+};
 
 const updateAudioMode = (mode: AudioCaptureMode) => {
-  appSettings = { ...appSettings, audioMode: mode }
-  listeningState = { ...listeningState, audioMode: mode }
+  appSettings = { ...appSettings, audioMode: mode };
+  listeningState = { ...listeningState, audioMode: mode };
   if (listeningState.active) {
-    stopAudioCapture()
-    startAudioCapture()
+    stopAudioCapture();
+    startAudioCapture();
   }
-  broadcastListeningState()
-}
+  broadcastListeningState();
+};
 
-const setListening = (active: boolean, source: 'hotkey' | 'ui') => {
+const setListening = (active: boolean, source: "hotkey" | "ui") => {
   if (listeningState.active === active) {
-    return
+    return;
   }
 
   if (active) {
-    overlayVisibilityBeforeListening = overlayWin?.isVisible() ?? false
-    overlayWin?.showInactive()
-    startAudioCapture()
+    overlayVisibilityBeforeListening = overlayWin?.isVisible() ?? false;
+    overlayWin?.showInactive();
+    startAudioCapture();
   } else {
-    stopAudioCapture()
-    clearTranscript()
+    stopAudioCapture();
+    clearTranscript();
     if (overlayVisibilityBeforeListening === false) {
-      overlayWin?.hide()
+      overlayWin?.hide();
     }
-    overlayVisibilityBeforeListening = null
+    overlayVisibilityBeforeListening = null;
   }
 
   listeningState = {
     active,
     source,
     audioMode: appSettings.audioMode,
-  }
-  broadcastListeningState()
-}
+  };
+  broadcastListeningState();
+};
 
-const toggleListening = (source: 'hotkey' | 'ui') => {
-  setListening(!listeningState.active, source)
-}
+const toggleListening = (source: "hotkey" | "ui") => {
+  setListening(!listeningState.active, source);
+};
 
 const registerGlobalHotkey = () => {
   if (!appSettings.hotkey) {
-    return
+    return;
   }
 
   const success = globalShortcut.register(appSettings.hotkey, () => {
-    toggleListening('hotkey')
-  })
+    toggleListening("hotkey");
+  });
 
   if (!success) {
-    console.warn(`[hotkey] failed to register: ${appSettings.hotkey}`)
-    return
+    console.warn(`[hotkey] failed to register: ${appSettings.hotkey}`);
+    return;
   }
 
   if (registeredHotkey && registeredHotkey !== appSettings.hotkey) {
-    globalShortcut.unregister(registeredHotkey)
+    globalShortcut.unregister(registeredHotkey);
   }
-  registeredHotkey = appSettings.hotkey
-}
+  registeredHotkey = appSettings.hotkey;
+};
 
 function createWindow() {
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
-  })
+  });
 
-  win.on('closed', () => {
-    overlayWin?.close()
-    overlayWin = null
-    win = null
-  })
+  win.on("closed", () => {
+    overlayWin?.close();
+    overlayWin = null;
+    win = null;
+  });
 
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    win.loadURL(VITE_DEV_SERVER_URL);
   } else {
     // win.loadFile('dist/index.html')
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 }
 
 function createOverlayWindow() {
-  const bounds = screen.getPrimaryDisplay().workArea
+  const bounds = screen.getPrimaryDisplay().workArea;
   overlayWin = new BrowserWindow({
     x: bounds.x,
     y: bounds.y,
@@ -224,121 +264,196 @@ function createOverlayWindow() {
     skipTaskbar: true,
     resizable: true,
     hasShadow: false,
-    backgroundColor: '#00000000',
+    backgroundColor: "#00000000",
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
-  })
+  });
 
-  overlayWin.setIgnoreMouseEvents(overlayClickThrough, { forward: true })
+  overlayWin.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
 
   if (VITE_DEV_SERVER_URL) {
-    const overlayUrl = new URL('overlay.html', VITE_DEV_SERVER_URL)
-    overlayWin.loadURL(overlayUrl.toString())
+    const overlayUrl = new URL("overlay.html", VITE_DEV_SERVER_URL);
+    overlayWin.loadURL(overlayUrl.toString());
   } else {
-    overlayWin.loadFile(path.join(RENDERER_DIST, 'overlay.html'))
+    overlayWin.loadFile(path.join(RENDERER_DIST, "overlay.html"));
   }
 
-  overlayWin.on('closed', () => {
-    overlayWin = null
-  })
+  overlayWin.on("closed", () => {
+    overlayWin = null;
+  });
 
-  screen.on('display-metrics-changed', () => {
+  screen.on("display-metrics-changed", () => {
     if (!overlayWin) {
-      return
+      return;
     }
-    const nextBounds = screen.getPrimaryDisplay().workArea
-    overlayWin.setBounds(nextBounds)
-  })
+    const nextBounds = screen.getPrimaryDisplay().workArea;
+    overlayWin.setBounds(nextBounds);
+  });
 }
 
 function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.overlay.show, () => {
-    overlayWin?.showInactive()
-  })
+    overlayWin?.showInactive();
+  });
   ipcMain.on(IPC_CHANNELS.overlay.hide, () => {
-    overlayWin?.hide()
-  })
-  ipcMain.on(IPC_CHANNELS.overlay.updateContent, (_event, content: OverlayContent) => {
-    overlayWin?.webContents.send(IPC_CHANNELS.overlay.content, content)
-  })
-  ipcMain.on(IPC_CHANNELS.overlay.updateStyle, (_event, style: Partial<OverlayStyle>) => {
-    appSettings = { ...appSettings, overlayStyle: { ...appSettings.overlayStyle, ...style } }
-    overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style)
-  })
-  ipcMain.on(IPC_CHANNELS.overlay.setClickThrough, (_event, enabled: boolean) => {
-    overlayClickThrough = enabled
-    overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true })
-  })
+    overlayWin?.hide();
+  });
+  ipcMain.on(
+    IPC_CHANNELS.overlay.updateContent,
+    (_event, content: OverlayContent) => {
+      overlayWin?.webContents.send(IPC_CHANNELS.overlay.content, content);
+    },
+  );
+  ipcMain.on(
+    IPC_CHANNELS.overlay.updateStyle,
+    (_event, style: Partial<OverlayStyle>) => {
+      appSettings = {
+        ...appSettings,
+        overlayStyle: { ...appSettings.overlayStyle, ...style },
+      };
+      overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style);
+    },
+  );
+  ipcMain.on(
+    IPC_CHANNELS.overlay.setClickThrough,
+    (_event, enabled: boolean) => {
+      overlayClickThrough = enabled;
+      overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
+    },
+  );
 
-  ipcMain.on(IPC_CHANNELS.listening.start, () => setListening(true, 'ui'))
-  ipcMain.on(IPC_CHANNELS.listening.stop, () => setListening(false, 'ui'))
-  ipcMain.on(IPC_CHANNELS.listening.toggle, () => toggleListening('ui'))
-  ipcMain.handle(IPC_CHANNELS.listening.getState, async () => listeningState)
+  ipcMain.on(IPC_CHANNELS.listening.start, () => setListening(true, "ui"));
+  ipcMain.on(IPC_CHANNELS.listening.stop, () => setListening(false, "ui"));
+  ipcMain.on(IPC_CHANNELS.listening.toggle, () => toggleListening("ui"));
+  ipcMain.handle(IPC_CHANNELS.listening.getState, async () => listeningState);
 
-  ipcMain.handle(IPC_CHANNELS.stt.getConfig, async () => sttConfig)
-  ipcMain.handle(IPC_CHANNELS.stt.setConfig, async (_event, config: SttConfig) => {
-    sttConfig = { ...sttConfig, ...config }
-  })
-  ipcMain.on(IPC_CHANNELS.stt.simulate, (_event, text: string) => {
-    simulateTranscript(text)
-  })
-  ipcMain.on(IPC_CHANNELS.stt.clear, () => {
-    clearTranscript()
-  })
-
-  ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
-  ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => scaffold)
-  ipcMain.handle(IPC_CHANNELS.scaffolds.delete, async () => undefined)
-  ipcMain.handle(IPC_CHANNELS.scaffolds.setActive, async () => undefined)
-
+  ipcMain.handle(IPC_CHANNELS.stt.getConfig, async () => sttConfig);
   ipcMain.handle(
-    IPC_CHANNELS.settings.load,
-    async () => appSettings,
-  )
-  ipcMain.handle(IPC_CHANNELS.settings.save, async (_event, next: AppSettings) => {
-    const prevHotkey = appSettings.hotkey
-    const prevAudioMode = appSettings.audioMode
-    appSettings = { ...appSettings, ...next }
+    IPC_CHANNELS.stt.setConfig,
+    async (_event, config: SttConfig) => {
+      sttConfig = { ...sttConfig, ...config };
+    },
+  );
+  ipcMain.on(IPC_CHANNELS.stt.simulate, (_event, text: string) => {
+    simulateTranscript(text);
+  });
+  ipcMain.on(IPC_CHANNELS.stt.clear, () => {
+    clearTranscript();
+  });
 
-    if (appSettings.hotkey !== prevHotkey) {
-      registerGlobalHotkey()
+  ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => {
+    ensureRepositories();
+    if (!scaffoldRepository) {
+      return [] as Scaffold[];
     }
-    if (appSettings.audioMode !== prevAudioMode) {
-      updateAudioMode(appSettings.audioMode)
+    return scaffoldRepository.list();
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.scaffolds.upsert,
+    async (_event, scaffold: Scaffold) => {
+      ensureRepositories();
+      if (!scaffoldRepository) {
+        return scaffold;
+      }
+      return scaffoldRepository.upsert(scaffold);
+    },
+  );
+  ipcMain.handle(IPC_CHANNELS.scaffolds.delete, async (_event, id: string) => {
+    ensureRepositories();
+    if (!scaffoldRepository) {
+      return;
     }
-  })
+    await scaffoldRepository.delete(id);
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.scaffolds.setActive,
+    async (_event, id: string) => {
+      ensureRepositories();
+      if (!scaffoldRepository) {
+        return;
+      }
+      await scaffoldRepository.setActiveId(id);
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.settings.load, async () => {
+    ensureRepositories();
+    if (settingsRepository) {
+      const settings = await settingsRepository.load();
+      appSettings = {
+        ...appSettings,
+        ...settings,
+      };
+    }
+    const activeScaffoldId = scaffoldRepository
+      ? await scaffoldRepository.getActiveId()
+      : appSettings.activeScaffoldId;
+    appSettings = {
+      ...appSettings,
+      activeScaffoldId,
+    };
+    return appSettings;
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.settings.save,
+    async (_event, next: AppSettings) => {
+      const prevHotkey = appSettings.hotkey;
+      const prevAudioMode = appSettings.audioMode;
+      appSettings = { ...appSettings, ...next };
+
+      ensureRepositories();
+      if (settingsRepository) {
+        await settingsRepository.save({
+          overlayStyle: appSettings.overlayStyle,
+          audioMode: appSettings.audioMode,
+          hotkey: appSettings.hotkey,
+        });
+      }
+      if (scaffoldRepository) {
+        await scaffoldRepository.setActiveId(appSettings.activeScaffoldId);
+      }
+
+      if (appSettings.hotkey !== prevHotkey) {
+        registerGlobalHotkey();
+      }
+      if (appSettings.audioMode !== prevAudioMode) {
+        updateAudioMode(appSettings.audioMode);
+      }
+    },
+  );
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
-    overlayWin = null
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
+    overlayWin = null;
   }
-})
+});
 
-app.on('activate', () => {
+app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
-    createOverlayWindow()
+    createWindow();
+    createOverlayWindow();
   }
-})
+});
 
-app.whenReady().then(() => {
-  registerIpcHandlers()
-  createWindow()
-  createOverlayWindow()
-  registerGlobalHotkey()
-})
+app.whenReady().then(async () => {
+  await hydrateAppSettings();
+  registerIpcHandlers();
+  createWindow();
+  createOverlayWindow();
+  registerGlobalHotkey();
+});
 
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll()
-})
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+});
