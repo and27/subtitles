@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type {
   AppSettings,
+  AudioCaptureMode,
   ListeningState,
   OverlayStyle,
   Scaffold,
@@ -22,6 +23,7 @@ const DEFAULT_STYLE: OverlayStyle = {
   positionY: 0.2,
 }
 
+const DEFAULT_AUDIO_MODE: AudioCaptureMode = 'system'
 const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
 
 const seedScaffolds: Scaffold[] = [
@@ -99,10 +101,12 @@ function App() {
   )
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE)
   const [overlayVisible, setOverlayVisible] = useState(true)
+  const [audioMode, setAudioMode] = useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE)
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY)
   const [hotkeyDraft, setHotkeyDraft] = useState(DEFAULT_HOTKEY)
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
+    audioMode: DEFAULT_AUDIO_MODE,
   })
   const [settingsLoaded, setSettingsLoaded] = useState(false)
 
@@ -127,6 +131,7 @@ function App() {
       if (settings.activeScaffoldId) {
         setActiveId(settings.activeScaffoldId)
       }
+      setAudioMode(settings.audioMode ?? DEFAULT_AUDIO_MODE)
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY)
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY)
       setSettingsLoaded(true)
@@ -222,8 +227,14 @@ function App() {
       overlayStyle,
       activeScaffoldId: activeId || null,
       hotkey,
+      audioMode,
       ...overrides,
     })
+  }
+
+  const handleAudioModeChange = (mode: AudioCaptureMode) => {
+    setAudioMode(mode)
+    persistSettings({ audioMode: mode })
   }
 
   const handleApplyHotkey = () => {
@@ -283,6 +294,18 @@ function App() {
               {listeningState.active ? 'Stop listening' : 'Start listening'}
             </button>
           </div>
+          <label className="field">
+            Audio source
+            <select
+              value={audioMode}
+              onChange={(event) => handleAudioModeChange(event.target.value as AudioCaptureMode)}
+            >
+              <option value="system">System audio (Meet/Zoom/browser)</option>
+              <option value="mic">Microphone only</option>
+              <option value="mixed">Mixed (system + mic)</option>
+            </select>
+            <span className="field-hint">Windows only for now. Toggle anytime.</span>
+          </label>
           <label className="field">
             Hotkey
             <div className="hotkey-row">
