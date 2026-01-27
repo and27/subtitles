@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs/promises";
 import {
   FileScaffoldRepository,
   FileSettingsRepository,
@@ -57,6 +58,7 @@ const defaultSettings: AppSettings = {
   activeScaffoldId: null,
   hotkey: "CommandOrControl+Shift+Space",
   audioMode: "system",
+  saveTranscript: false,
 };
 
 let appSettings: AppSettings = { ...defaultSettings };
@@ -83,6 +85,8 @@ const storeLogger: StoreLogger = {
 
 const getStorePath = () =>
   path.join(app.getPath("userData"), "subtitles-store.json");
+const getTranscriptPath = () =>
+  path.join(app.getPath("userData"), "subtitles-transcript.txt");
 
 const ensureRepositories = () => {
   if (!scaffoldRepository || !settingsRepository) {
@@ -121,6 +125,9 @@ const broadcastTranscript = (text: string, isFinal: boolean) => {
   };
   win?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
   overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
+  if (appSettings.saveTranscript && text.trim().length > 0 && isFinal) {
+    void saveTranscriptToFile(text);
+  }
 };
 
 const clearTranscript = () => {
@@ -130,6 +137,23 @@ const clearTranscript = () => {
     transcriptTimer = null;
   }
   broadcastTranscript("", true);
+};
+
+const saveTranscriptToFile = async (text: string) => {
+  const filePath = getTranscriptPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, text, "utf8");
+};
+
+const clearSavedTranscriptFile = async () => {
+  const filePath = getTranscriptPath();
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn("[storage] failed to clear transcript file");
+    }
+  }
 };
 
 const simulateTranscript = (input: string) => {
@@ -343,6 +367,9 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.stt.clear, () => {
     clearTranscript();
   });
+  ipcMain.on(IPC_CHANNELS.transcript.clearSaved, async () => {
+    await clearSavedTranscriptFile();
+  });
 
   ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => {
     ensureRepositories();
@@ -402,6 +429,7 @@ function registerIpcHandlers() {
     async (_event, next: AppSettings) => {
       const prevHotkey = appSettings.hotkey;
       const prevAudioMode = appSettings.audioMode;
+      const prevSaveTranscript = appSettings.saveTranscript;
       appSettings = { ...appSettings, ...next };
 
       ensureRepositories();
@@ -410,6 +438,7 @@ function registerIpcHandlers() {
           overlayStyle: appSettings.overlayStyle,
           audioMode: appSettings.audioMode,
           hotkey: appSettings.hotkey,
+          saveTranscript: appSettings.saveTranscript,
         });
       }
       if (scaffoldRepository) {
@@ -421,6 +450,9 @@ function registerIpcHandlers() {
       }
       if (appSettings.audioMode !== prevAudioMode) {
         updateAudioMode(appSettings.audioMode);
+      }
+      if (appSettings.saveTranscript !== prevSaveTranscript && !appSettings.saveTranscript) {
+        await clearSavedTranscriptFile();
       }
     },
   );

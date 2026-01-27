@@ -41,6 +41,9 @@ const subtitles: SubtitlesAPI = {
     toggle: () => ipcRenderer.send(IPC_CHANNELS.listening.toggle),
     getState: () => ipcRenderer.invoke(IPC_CHANNELS.listening.getState),
   },
+  transcript: {
+    clearSaved: () => ipcRenderer.send(IPC_CHANNELS.transcript.clearSaved),
+  },
   stt: {
     getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getConfig),
     setConfig: (config: SttConfig) => ipcRenderer.invoke(IPC_CHANNELS.stt.setConfig, config),
