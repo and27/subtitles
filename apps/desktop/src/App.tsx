@@ -109,6 +109,7 @@ function App() {
     audioMode: DEFAULT_AUDIO_MODE,
   })
   const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [scaffoldsLoaded, setScaffoldsLoaded] = useState(false)
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft])
 
@@ -125,6 +126,7 @@ function App() {
         setScaffolds(items)
         setActiveId(items[0]?.id ?? '')
       }
+      setScaffoldsLoaded(true)
     })
     window.subtitles.settings.load().then((settings) => {
       setOverlayStyle(settings.overlayStyle)
@@ -150,11 +152,11 @@ function App() {
   }, [overlayStyle])
 
   useEffect(() => {
-    if (!settingsLoaded) {
+    if (!settingsLoaded || !scaffoldsLoaded) {
       return
     }
     persistSettings()
-  }, [overlayStyle])
+  }, [overlayStyle, settingsLoaded, scaffoldsLoaded])
 
   useEffect(() => {
     if (!activeId) {
