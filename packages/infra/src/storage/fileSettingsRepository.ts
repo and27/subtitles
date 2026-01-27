@@ -1,6 +1,6 @@
 import type { AppSettings } from 'core'
 import type { SettingsRepositoryPort } from 'core'
-import { loadStore, saveStore, type StoreLogger } from './store'
+import { loadStore, updateStore, type StoreLogger } from './store'
 
 export class FileSettingsRepository implements SettingsRepositoryPort {
   private filePath: string
@@ -17,8 +17,12 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
   }
 
   async save(settings: AppSettings): Promise<void> {
-    const data = await loadStore(this.filePath, this.logger)
-    data.overlayStyle = settings.overlayStyle
-    await saveStore(this.filePath, data)
+    await updateStore(
+      this.filePath,
+      (data) => {
+        data.overlayStyle = settings.overlayStyle
+      },
+      this.logger,
+    )
   }
 }
