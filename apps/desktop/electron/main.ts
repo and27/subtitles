@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import {
   IPC_CHANNELS,
+  type AudioCaptureMode,
   type OverlayContent,
   type OverlayStyle,
   type Scaffold,
@@ -46,11 +47,13 @@ const defaultSettings: AppSettings = {
   overlayStyle: defaultOverlayStyle,
   activeScaffoldId: null,
   hotkey: 'CommandOrControl+Shift+Space',
+  audioMode: 'system',
 }
 
 let appSettings: AppSettings = { ...defaultSettings }
 let listeningState: ListeningState = {
   active: false,
+  audioMode: defaultSettings.audioMode,
 }
 let registeredHotkey: string | null = null
 let overlayVisibilityBeforeListening: boolean | null = null
@@ -61,11 +64,21 @@ const broadcastListeningState = () => {
 }
 
 const startAudioCapture = () => {
-  console.log('[audio] start capture')
+  console.log(`[audio] start capture (${appSettings.audioMode})`)
 }
 
 const stopAudioCapture = () => {
   console.log('[audio] stop capture')
+}
+
+const updateAudioMode = (mode: AudioCaptureMode) => {
+  appSettings = { ...appSettings, audioMode: mode }
+  listeningState = { ...listeningState, audioMode: mode }
+  if (listeningState.active) {
+    stopAudioCapture()
+    startAudioCapture()
+  }
+  broadcastListeningState()
 }
 
 const setListening = (active: boolean, source: 'hotkey' | 'ui') => {
@@ -88,6 +101,7 @@ const setListening = (active: boolean, source: 'hotkey' | 'ui') => {
   listeningState = {
     active,
     source,
+    audioMode: appSettings.audioMode,
   }
   broadcastListeningState()
 }
@@ -220,10 +234,14 @@ function registerIpcHandlers() {
   )
   ipcMain.handle(IPC_CHANNELS.settings.save, async (_event, next: AppSettings) => {
     const prevHotkey = appSettings.hotkey
+    const prevAudioMode = appSettings.audioMode
     appSettings = { ...appSettings, ...next }
 
     if (appSettings.hotkey !== prevHotkey) {
       registerGlobalHotkey()
+    }
+    if (appSettings.audioMode !== prevAudioMode) {
+      updateAudioMode(appSettings.audioMode)
     }
   })
 }
