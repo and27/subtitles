@@ -1,7 +1,8 @@
 const root = document.getElementById('overlay-root')
 const contentEl = document.getElementById('overlay-content')
+const statusEl = document.getElementById('overlay-status')
 
-if (!root || !contentEl) {
+if (!root || !contentEl || !statusEl) {
   throw new Error('Overlay root elements not found')
 }
 
@@ -49,6 +50,11 @@ const renderContent = (text: string) => {
   })
 }
 
+const renderListeningState = (active: boolean) => {
+  statusEl.textContent = active ? 'Listening' : 'Idle'
+  statusEl.dataset.state = active ? 'listening' : 'idle'
+}
+
 applyStyle({ opacity: 0.9, fontSize: 24, lineHeight: 1.4, positionY: 0.2 })
 window.addEventListener('resize', applyPosition)
 
@@ -58,4 +64,8 @@ window.subtitles.onOverlayContent((content) => {
 
 window.subtitles.onOverlayStyle((style) => {
   applyStyle(style)
+})
+
+window.subtitles.onListeningState((state) => {
+  renderListeningState(state.active)
 })

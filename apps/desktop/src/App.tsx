@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { OverlayStyle, Scaffold } from '../ipc/contracts'
+import type {
+  AppSettings,
+  ListeningState,
+  OverlayStyle,
+  Scaffold,
+} from '../ipc/contracts'
 import './App.css'
 
 type ScaffoldDraft = {
@@ -16,6 +21,8 @@ const DEFAULT_STYLE: OverlayStyle = {
   lineHeight: 1.4,
   positionY: 0.2,
 }
+
+const DEFAULT_HOTKEY = 'CommandOrControl+Shift+Space'
 
 const seedScaffolds: Scaffold[] = [
   {
@@ -92,6 +99,12 @@ function App() {
   )
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE)
   const [overlayVisible, setOverlayVisible] = useState(true)
+  const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY)
+  const [hotkeyDraft, setHotkeyDraft] = useState(DEFAULT_HOTKEY)
+  const [listeningState, setListeningState] = useState<ListeningState>({
+    active: false,
+  })
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft])
 
@@ -114,7 +127,17 @@ function App() {
       if (settings.activeScaffoldId) {
         setActiveId(settings.activeScaffoldId)
       }
+      setHotkey(settings.hotkey ?? DEFAULT_HOTKEY)
+      setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY)
+      setSettingsLoaded(true)
     })
+    const unsubscribe = window.subtitles.onListeningState((state) => {
+      setListeningState(state)
+    })
+    window.subtitles.listening.getState().then((state) => {
+      setListeningState(state)
+    })
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -127,12 +150,13 @@ function App() {
     }
     const content = buildOverlayText(activeDraft)
     window.subtitles.overlay.updateContent({ text: content })
-    if (overlayVisible) {
+    const shouldShowOverlay = overlayVisible || listeningState.active
+    if (shouldShowOverlay) {
       window.subtitles.overlay.show()
     } else {
       window.subtitles.overlay.hide()
     }
-  }, [activeDraft, activeId, overlayVisible])
+  }, [activeDraft, activeId, overlayVisible, listeningState.active])
 
   const handleCreate = () => {
     const id = crypto.randomUUID?.() ?? `scaffold-${Date.now()}`
@@ -190,6 +214,27 @@ function App() {
     setOverlayStyle((prev) => ({ ...prev, ...patch }))
   }
 
+  const persistSettings = (overrides: Partial<AppSettings> = {}) => {
+    if (!settingsLoaded) {
+      return
+    }
+    window.subtitles.settings.save({
+      overlayStyle,
+      activeScaffoldId: activeId || null,
+      hotkey,
+      ...overrides,
+    })
+  }
+
+  const handleApplyHotkey = () => {
+    const next = hotkeyDraft.trim()
+    if (!next) {
+      return
+    }
+    setHotkey(next)
+    persistSettings({ hotkey: next })
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -209,6 +254,10 @@ function App() {
             />
             <span>Overlay visible</span>
           </label>
+          <div className={`status-badge ${listeningState.active ? 'is-on' : 'is-off'}`}>
+            <span className="status-dot" />
+            <span>{listeningState.active ? 'Listening' : 'Idle'}</span>
+          </div>
           <button className="primary" type="button" onClick={handleCreate}>
             New scaffold
           </button>
@@ -216,6 +265,43 @@ function App() {
       </header>
 
       <main className="app-grid">
+        <section className="panel live-panel" aria-label="Live assist controls">
+          <div className="panel-header">
+            <h2>Live assist</h2>
+            <p>Hotkey starts listening and shows the overlay.</p>
+          </div>
+          <div className="listening-row">
+            <div className={`status-badge ${listeningState.active ? 'is-on' : 'is-off'}`}>
+              <span className="status-dot" />
+              <span>{listeningState.active ? 'Listening' : 'Idle'}</span>
+            </div>
+            <button
+              className={listeningState.active ? 'ghost' : 'primary'}
+              type="button"
+              onClick={() => window.subtitles.listening.toggle()}
+            >
+              {listeningState.active ? 'Stop listening' : 'Start listening'}
+            </button>
+          </div>
+          <label className="field">
+            Hotkey
+            <div className="hotkey-row">
+              <input
+                type="text"
+                value={hotkeyDraft}
+                onChange={(event) => setHotkeyDraft(event.target.value)}
+                placeholder={DEFAULT_HOTKEY}
+              />
+              <button className="ghost" type="button" onClick={handleApplyHotkey}>
+                Apply
+              </button>
+            </div>
+            <span className="field-hint">
+              Example: Ctrl+Shift+Space or CommandOrControl+Shift+Space.
+            </span>
+          </label>
+        </section>
+
         <section className="panel list-panel" aria-label="Scaffold list">
           <div className="panel-header">
             <h2>Scaffolds</h2>
