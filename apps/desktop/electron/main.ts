@@ -9,6 +9,8 @@ import {
   type Scaffold,
   type AppSettings,
   type ListeningState,
+  type SttConfig,
+  type SttTranscript,
 } from '../ipc/contracts'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -57,10 +59,64 @@ let listeningState: ListeningState = {
 }
 let registeredHotkey: string | null = null
 let overlayVisibilityBeforeListening: boolean | null = null
+let sttConfig: SttConfig = {
+  provider: 'local',
+}
+let transcriptText = ''
+let transcriptTimer: NodeJS.Timeout | null = null
 
 const broadcastListeningState = () => {
   win?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
   overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState)
+}
+
+const broadcastTranscript = (text: string, isFinal: boolean) => {
+  const payload: SttTranscript = {
+    text,
+    isFinal,
+    updatedAt: Date.now(),
+  }
+  win?.webContents.send(IPC_CHANNELS.stt.transcript, payload)
+  overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload)
+}
+
+const clearTranscript = () => {
+  transcriptText = ''
+  if (transcriptTimer) {
+    clearInterval(transcriptTimer)
+    transcriptTimer = null
+  }
+  broadcastTranscript('', true)
+}
+
+const simulateTranscript = (input: string) => {
+  if (!listeningState.active) {
+    return
+  }
+  const words = input
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) {
+    clearTranscript()
+    return
+  }
+  if (transcriptTimer) {
+    clearInterval(transcriptTimer)
+    transcriptTimer = null
+  }
+  let index = 0
+  transcriptText = ''
+  transcriptTimer = setInterval(() => {
+    transcriptText = words.slice(0, index + 1).join(' ')
+    const isFinal = index >= words.length - 1
+    broadcastTranscript(transcriptText, isFinal)
+    if (isFinal && transcriptTimer) {
+      clearInterval(transcriptTimer)
+      transcriptTimer = null
+    }
+    index += 1
+  }, 140)
 }
 
 const startAudioCapture = () => {
@@ -92,6 +148,7 @@ const setListening = (active: boolean, source: 'hotkey' | 'ui') => {
     startAudioCapture()
   } else {
     stopAudioCapture()
+    clearTranscript()
     if (overlayVisibilityBeforeListening === false) {
       overlayWin?.hide()
     }
@@ -220,6 +277,17 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.listening.stop, () => setListening(false, 'ui'))
   ipcMain.on(IPC_CHANNELS.listening.toggle, () => toggleListening('ui'))
   ipcMain.handle(IPC_CHANNELS.listening.getState, async () => listeningState)
+
+  ipcMain.handle(IPC_CHANNELS.stt.getConfig, async () => sttConfig)
+  ipcMain.handle(IPC_CHANNELS.stt.setConfig, async (_event, config: SttConfig) => {
+    sttConfig = { ...sttConfig, ...config }
+  })
+  ipcMain.on(IPC_CHANNELS.stt.simulate, (_event, text: string) => {
+    simulateTranscript(text)
+  })
+  ipcMain.on(IPC_CHANNELS.stt.clear, () => {
+    clearTranscript()
+  })
 
   ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => [] as Scaffold[])
   ipcMain.handle(IPC_CHANNELS.scaffolds.upsert, async (_event, scaffold: Scaffold) => scaffold)
