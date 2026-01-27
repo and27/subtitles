@@ -57,6 +57,9 @@ const renderListeningState = (active: boolean) => {
 
 applyStyle({ opacity: 0.9, fontSize: 24, lineHeight: 1.4, positionY: 0.2 })
 window.addEventListener('resize', applyPosition)
+window.subtitles.listening.getState().then((state) => {
+  renderListeningState(state.active)
+})
 
 window.subtitles.onOverlayContent((content) => {
   renderContent(content.text)
