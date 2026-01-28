@@ -179,7 +179,8 @@ const resetSttMetrics = () => {
 
 const recordTranscriptUpdate = () => {
   const now = Date.now();
-  const targetMs = appSettings.latencyTargetMs ?? defaultSettings.latencyTargetMs;
+  const targetMs =
+    appSettings.latencyTargetMs ?? defaultSettings.latencyTargetMs ?? 1200;
   const lastUpdateAt = sttMetrics.lastUpdateAt;
   const intervalMs = lastUpdateAt ? now - lastUpdateAt : null;
 
