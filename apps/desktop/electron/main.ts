@@ -2,7 +2,6 @@ import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs/promises";
-import { Blob } from "node:buffer";
 import {
   FileScaffoldRepository,
   FileSettingsRepository,
@@ -369,7 +368,8 @@ const transcribeWhisper = async (
     throw new Error("STT_CLOUD_API_KEY missing.");
   }
   const form = new FormData();
-  const blob = new Blob([data], { type: mimeType || "audio/webm" });
+  const safeData = new Uint8Array(data);
+  const blob = new Blob([safeData], { type: mimeType || "audio/webm" });
   form.append("file", blob, "audio.webm");
   form.append("model", model);
 
