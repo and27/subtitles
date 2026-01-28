@@ -16,6 +16,8 @@ const createDefaultStore = (): StoreData => ({
   hotkey: 'CommandOrControl+Shift+Space',
   saveTranscript: false,
   latencyTargetMs: 1200,
+  llmProvider: 'local',
+  llmModel: 'gpt-4o-mini',
 })
 
 const storeQueue = new Map<string, Promise<unknown>>()

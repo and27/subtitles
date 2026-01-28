@@ -26,6 +26,8 @@ export const storeSchema = z.object({
   hotkey: z.string().default('CommandOrControl+Shift+Space'),
   saveTranscript: z.boolean().default(false),
   latencyTargetMs: z.number().default(1200),
+  llmProvider: z.enum(['local', 'openai']).default('local'),
+  llmModel: z.string().default('gpt-4o-mini'),
 })
 
 export type StoreData = z.infer<typeof storeSchema>

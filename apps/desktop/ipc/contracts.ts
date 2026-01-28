@@ -27,6 +27,11 @@ export const IPC_CHANNELS = {
     getStatus: 'stt:getStatus',
     status: 'stt:status',
   },
+  llm: {
+    getConfig: 'llm:getConfig',
+    setConfig: 'llm:setConfig',
+    generate: 'llm:generate',
+  },
   transcript: {
     clearSaved: 'transcript:clearSaved',
   },
@@ -70,6 +75,8 @@ export type AppSettings = {
   audioMode: AudioCaptureMode
   saveTranscript?: boolean
   latencyTargetMs?: number
+  llmProvider?: LlmProvider
+  llmModel?: string
 }
 
 export type ListeningState = {
@@ -89,6 +96,27 @@ export type SttTranscript = {
   text: string
   isFinal: boolean
   updatedAt: number
+}
+
+export type LlmProvider = 'local' | 'openai'
+
+export type LlmMode = 'coaching' | 'direct'
+
+export type LlmConfig = {
+  provider: LlmProvider
+  model?: string
+  apiKey?: string
+}
+
+export type LlmRequest = {
+  question: string
+  mode?: LlmMode
+}
+
+export type LlmResponse = {
+  text: string
+  updatedAt: number
+  provider: LlmProvider
 }
 
 export type SttMetrics = {
@@ -147,6 +175,11 @@ export interface SubtitlesAPI {
     clear: () => void
     getMetrics: () => Promise<SttMetrics>
     getStatus: () => Promise<SttRuntimeStatus>
+  }
+  llm: {
+    getConfig: () => Promise<LlmConfig>
+    setConfig: (config: LlmConfig) => Promise<void>
+    generate: (request: LlmRequest) => Promise<LlmResponse>
   }
   transcript: {
     clearSaved: () => void
