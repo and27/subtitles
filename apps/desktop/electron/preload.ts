@@ -8,6 +8,8 @@ import {
   type ListeningState,
   type SttConfig,
   type SttTranscript,
+  type SttMetrics,
+  type SttRuntimeStatus,
   type SubtitlesAPI,
 } from '../ipc/contracts'
 
@@ -48,7 +50,10 @@ const subtitles: SubtitlesAPI = {
     getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getConfig),
     setConfig: (config: SttConfig) => ipcRenderer.invoke(IPC_CHANNELS.stt.setConfig, config),
     simulate: (text: string) => ipcRenderer.send(IPC_CHANNELS.stt.simulate, text),
+    manual: (text: string) => ipcRenderer.send(IPC_CHANNELS.stt.manual, text),
     clear: () => ipcRenderer.send(IPC_CHANNELS.stt.clear),
+    getMetrics: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getMetrics),
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getStatus),
   },
   onOverlayContent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, content: OverlayContent) =>
@@ -73,6 +78,18 @@ const subtitles: SubtitlesAPI = {
       listener(transcript)
     ipcRenderer.on(IPC_CHANNELS.stt.transcript, handler)
     return () => ipcRenderer.off(IPC_CHANNELS.stt.transcript, handler)
+  },
+  onSttMetrics: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, metrics: SttMetrics) =>
+      listener(metrics)
+    ipcRenderer.on(IPC_CHANNELS.stt.metrics, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.stt.metrics, handler)
+  },
+  onSttStatus: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: SttRuntimeStatus) =>
+      listener(status)
+    ipcRenderer.on(IPC_CHANNELS.stt.status, handler)
+    return () => ipcRenderer.off(IPC_CHANNELS.stt.status, handler)
   },
 }
 

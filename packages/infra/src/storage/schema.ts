@@ -25,6 +25,7 @@ export const storeSchema = z.object({
   audioMode: audioModeSchema,
   hotkey: z.string().default('CommandOrControl+Shift+Space'),
   saveTranscript: z.boolean().default(false),
+  latencyTargetMs: z.number().default(1200),
 })
 
 export type StoreData = z.infer<typeof storeSchema>

@@ -18,6 +18,7 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       audioMode: data.audioMode,
       hotkey: data.hotkey,
       saveTranscript: data.saveTranscript,
+      latencyTargetMs: data.latencyTargetMs,
     }
   }
 
@@ -34,6 +35,9 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
         }
         if (settings.saveTranscript !== undefined) {
           data.saveTranscript = settings.saveTranscript
+        }
+        if (settings.latencyTargetMs) {
+          data.latencyTargetMs = settings.latencyTargetMs
         }
       },
       this.logger,

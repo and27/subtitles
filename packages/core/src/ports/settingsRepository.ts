@@ -7,6 +7,7 @@ export type AppSettings = {
   audioMode?: AudioCaptureMode
   hotkey?: string
   saveTranscript?: boolean
+  latencyTargetMs?: number
 }
 
 export interface SettingsRepositoryPort {
