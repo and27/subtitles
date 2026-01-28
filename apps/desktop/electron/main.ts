@@ -29,6 +29,50 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const findEnvPath = async (filename: string): Promise<string | null> => {
+  let current = process.cwd();
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = path.join(current, filename);
+    try {
+      await fs.access(candidate);
+      return candidate;
+    } catch {
+      // keep walking up
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return null;
+};
+
+const loadLocalEnv = async () => {
+  const envPath = await findEnvPath(".env.local");
+  if (!envPath) {
+    return;
+  }
+  try {
+    const raw = await fs.readFile(envPath, "utf8");
+    raw.split(/\r?\n/).forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        return;
+      }
+      const [key, ...rest] = trimmed.split("=");
+      if (!key || rest.length === 0) {
+        return;
+      }
+      if (process.env[key] === undefined) {
+        process.env[key] = rest.join("=").trim();
+      }
+    });
+  } catch {
+    // Ignore missing .env.local in prod or when not present.
+  }
+};
+
 // The built directory structure
 //
 // ├─┬─┬ dist
@@ -179,8 +223,11 @@ const resetSttMetrics = () => {
 
 const recordTranscriptUpdate = () => {
   const now = Date.now();
+  const envTarget = Number(process.env.LATENCY_TARGET_MS);
   const targetMs =
-    appSettings.latencyTargetMs ?? defaultSettings.latencyTargetMs ?? 1200;
+    Number.isFinite(envTarget) && envTarget > 0
+      ? envTarget
+      : appSettings.latencyTargetMs ?? defaultSettings.latencyTargetMs ?? 1200;
   const lastUpdateAt = sttMetrics.lastUpdateAt;
   const intervalMs = lastUpdateAt ? now - lastUpdateAt : null;
 
@@ -709,6 +756,11 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(async () => {
+  await loadLocalEnv();
+  console.log("[env] LLM_PROVIDER", process.env.LLM_PROVIDER ?? "unset");
+  console.log("[env] OPENAI_MODEL", process.env.OPENAI_MODEL ?? process.env.LLM_MODEL ?? "unset");
+  console.log("[env] OPENAI_API_KEY", process.env.OPENAI_API_KEY ? "set" : "unset");
+  console.log("[env] STT_CLOUD_API_KEY", process.env.STT_CLOUD_API_KEY ? "set" : "unset");
   await hydrateAppSettings();
   registerIpcHandlers();
   createWindow();
