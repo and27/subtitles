@@ -98,7 +98,6 @@ let overlayWin: BrowserWindow | null;
 
 let overlayClickThrough = true;
 let overlayDragMode = false;
-let overlayClickThroughBeforeDrag: boolean | null = null;
 
 const defaultOverlayStyle: OverlayStyle = {
   opacity: 0.9,
@@ -701,13 +700,9 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.overlay.setDragMode, (_event, enabled: boolean) => {
     overlayDragMode = enabled;
     if (enabled) {
-      overlayClickThroughBeforeDrag = overlayClickThrough;
-      overlayWin?.setIgnoreMouseEvents(false);
+      // Keep click-through while allowing overlay to receive pointer events.
+      overlayWin?.setIgnoreMouseEvents(true, { forward: true });
     } else {
-      if (overlayClickThroughBeforeDrag !== null) {
-        overlayClickThrough = overlayClickThroughBeforeDrag;
-      }
-      overlayClickThroughBeforeDrag = null;
       overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
     }
     broadcastOverlayDragMode();
