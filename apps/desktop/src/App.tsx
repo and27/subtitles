@@ -5,7 +5,6 @@ import type {
   ListeningState,
   OverlayStyle,
   Scaffold,
-  SttConfig,
   SttMetrics,
   SttProvider,
   SttRuntimeStatus,
@@ -34,7 +33,6 @@ const DEFAULT_AUDIO_MODE: AudioCaptureMode = "system";
 const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
 const DEFAULT_STT_PROVIDER: SttProvider = "local";
 const DEFAULT_LLM_PROVIDER: LlmProvider = "local";
-const DEFAULT_LATENCY_TARGET_MS = 1200;
 
 const seedScaffolds: Scaffold[] = [
   {
@@ -128,7 +126,6 @@ function App() {
   const [hotkeyDraft, setHotkeyDraft] = useState(DEFAULT_HOTKEY);
   const [sttProvider, setSttProvider] =
     useState<SttProvider>(DEFAULT_STT_PROVIDER);
-  const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
   const [llmMode, setLlmMode] = useState<"coaching" | "direct">("coaching");
@@ -212,7 +209,6 @@ function App() {
     });
     window.subtitles.stt.getConfig().then((config) => {
       setSttProvider(config.provider ?? DEFAULT_STT_PROVIDER);
-      setSttConfigLoaded(true);
     });
     window.subtitles.llm.getConfig().then((config) => {
       setLlmProvider(config.provider ?? DEFAULT_LLM_PROVIDER);
@@ -488,16 +484,6 @@ function App() {
     ? Math.max(0, sttStatus.backoffUntil - Date.now())
     : 0;
 
-  const persistSttConfig = (overrides: Partial<SttConfig> = {}) => {
-    if (!sttConfigLoaded) {
-      return;
-    }
-    window.subtitles.stt.setConfig({
-      provider: sttProvider,
-      ...overrides,
-    });
-  };
-
   const requestLlmHints = async (question: string) => {
     try {
       const response = await window.subtitles.llm.generate({
@@ -514,11 +500,6 @@ function App() {
         provider: llmProvider,
       });
     }
-  };
-
-  const handleSttProviderChange = (provider: SttProvider) => {
-    setSttProvider(provider);
-    persistSttConfig({ provider });
   };
 
   const handleLlmModeChange = (mode: "coaching" | "direct") => {
@@ -632,7 +613,9 @@ function App() {
             </div>
             <div className="metrics-row">
               <span>STT provider</span>
-              <strong>{sttProvider === "cloud" ? "Cloud (Whisper)" : "Local"}</strong>
+              <strong>
+                {sttProvider === "cloud" ? "Cloud (Whisper)" : "Local"}
+              </strong>
             </div>
             {sttStatus.lastError ? (
               <p className="field-hint">Last error: {sttStatus.lastError}</p>
