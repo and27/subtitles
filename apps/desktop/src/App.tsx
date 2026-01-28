@@ -134,7 +134,6 @@ function App() {
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
   const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
-  const [llmApiKey, setLlmApiKey] = useState("");
   const [llmConfigLoaded, setLlmConfigLoaded] = useState(false);
   const [latencyTargetMs, setLatencyTargetMs] = useState(
     DEFAULT_LATENCY_TARGET_MS,
@@ -222,7 +221,6 @@ function App() {
     window.subtitles.llm.getConfig().then((config) => {
       setLlmProvider(config.provider ?? DEFAULT_LLM_PROVIDER);
       setLlmModel(config.model ?? DEFAULT_LLM_MODEL);
-      setLlmApiKey(config.apiKey ?? "");
       setLlmConfigLoaded(true);
     });
     window.subtitles.stt.getMetrics().then((metrics) => {
@@ -447,7 +445,6 @@ function App() {
     window.subtitles.llm.setConfig({
       provider: llmProvider,
       model: llmModel,
-      apiKey: llmApiKey || undefined,
       ...overrides,
     });
   };
@@ -487,9 +484,6 @@ function App() {
     persistLlmConfig({ model: llmModel });
   };
 
-  const handleApplyLlmApiKey = () => {
-    persistLlmConfig({ apiKey: llmApiKey || undefined });
-  };
 
   return (
     <div className="app-shell">
@@ -607,25 +601,6 @@ function App() {
                 Apply
               </button>
             </div>
-          </label>
-          <label className="field">
-            LLM API key
-            <div className="hotkey-row">
-              <input
-                type="password"
-                value={llmApiKey}
-                onChange={(event) => setLlmApiKey(event.target.value)}
-                placeholder="sk-..."
-              />
-              <button
-                className="ghost"
-                type="button"
-                onClick={handleApplyLlmApiKey}
-              >
-                Save
-              </button>
-            </div>
-            <span className="field-hint">Stored in memory only.</span>
           </label>
           <label className="field">
             Latency target (ms)
