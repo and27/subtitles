@@ -132,6 +132,10 @@ function App() {
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
   const [llmMode, setLlmMode] = useState<"coaching" | "direct">("coaching");
+  const sttRecorderRef = useRef<MediaRecorder | null>(null);
+  const sttStreamRef = useRef<MediaStream | null>(null);
+  const sttChunksRef = useRef<Blob[]>([]);
+  const sttFinalizeRef = useRef(false);
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -247,6 +251,82 @@ function App() {
   useEffect(() => {
     window.subtitles.overlay.updateStyle(overlayStyle);
   }, [overlayStyle]);
+
+  useEffect(() => {
+    const flushFinalUpload = () => {
+      if (sttChunksRef.current.length === 0) {
+        return;
+      }
+      const blob = new Blob(sttChunksRef.current, { type: "audio/webm" });
+      sttChunksRef.current = [];
+      blob.arrayBuffer().then((buffer) => {
+        window.subtitles.stt.audioChunk({
+          data: buffer,
+          mimeType: blob.type || "audio/webm",
+          isFinal: true,
+        });
+      });
+    };
+
+    const stopRecorder = (sendFinal: boolean) => {
+      const recorder = sttRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        sttFinalizeRef.current = sendFinal;
+        recorder.stop();
+      } else if (sendFinal) {
+        flushFinalUpload();
+      } else {
+        sttChunksRef.current = [];
+      }
+      if (sttStreamRef.current) {
+        sttStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      sttRecorderRef.current = null;
+      sttStreamRef.current = null;
+    };
+
+    if (!listeningState.active || sttProvider !== "cloud") {
+      stopRecorder(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        sttStreamRef.current = stream;
+        const recorder = new MediaRecorder(stream, {
+          mimeType: "audio/webm",
+        });
+        recorder.ondataavailable = (event) => {
+          if (event.data.size === 0) {
+            return;
+          }
+          sttChunksRef.current.push(event.data);
+        };
+        recorder.onstop = () => {
+          if (sttFinalizeRef.current) {
+            sttFinalizeRef.current = false;
+            flushFinalUpload();
+          }
+        };
+        recorder.start();
+        sttRecorderRef.current = recorder;
+      })
+      .catch((error) => {
+        console.error("[stt] failed to start microphone capture", error);
+      });
+
+    return () => {
+      cancelled = true;
+      stopRecorder(true);
+    };
+  }, [listeningState.active, sttProvider]);
 
   useEffect(() => {
     setOverlayPageIndex(0);
@@ -549,6 +629,10 @@ function App() {
                   ? `${Math.ceil(backoffRemainingMs / 100) / 10}s`
                   : "—"}
               </strong>
+            </div>
+            <div className="metrics-row">
+              <span>STT provider</span>
+              <strong>{sttProvider === "cloud" ? "Cloud (Whisper)" : "Local"}</strong>
             </div>
             {sttStatus.lastError ? (
               <p className="field-hint">Last error: {sttStatus.lastError}</p>

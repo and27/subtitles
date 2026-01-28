@@ -20,6 +20,7 @@ export const IPC_CHANNELS = {
     setConfig: 'stt:setConfig',
     simulate: 'stt:simulate',
     manual: 'stt:manual',
+    audioChunk: 'stt:audioChunk',
     clear: 'stt:clear',
     transcript: 'stt:transcript',
     getMetrics: 'stt:getMetrics',
@@ -99,6 +100,12 @@ export type SttTranscript = {
   updatedAt: number
 }
 
+export type SttAudioChunk = {
+  data: ArrayBuffer
+  mimeType: string
+  isFinal: boolean
+}
+
 export type LlmProvider = 'local' | 'openai'
 
 export type LlmMode = 'coaching' | 'direct'
@@ -173,6 +180,7 @@ export interface SubtitlesAPI {
     setConfig: (config: SttConfig) => Promise<void>
     simulate: (text: string) => void
     manual: (text: string) => void
+    audioChunk: (chunk: SttAudioChunk) => void
     clear: () => void
     getMetrics: () => Promise<SttMetrics>
     getStatus: () => Promise<SttRuntimeStatus>

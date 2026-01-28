@@ -7,6 +7,7 @@ import {
   type AppSettings,
   type ListeningState,
   type SttConfig,
+  type SttAudioChunk,
   type SttTranscript,
   type SttMetrics,
   type SttRuntimeStatus,
@@ -56,6 +57,8 @@ const subtitles: SubtitlesAPI = {
     simulate: (text: string) =>
       ipcRenderer.send(IPC_CHANNELS.stt.simulate, text),
     manual: (text: string) => ipcRenderer.send(IPC_CHANNELS.stt.manual, text),
+    audioChunk: (chunk: SttAudioChunk) =>
+      ipcRenderer.send(IPC_CHANNELS.stt.audioChunk, chunk),
     clear: () => ipcRenderer.send(IPC_CHANNELS.stt.clear),
     getMetrics: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getMetrics),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getStatus),
