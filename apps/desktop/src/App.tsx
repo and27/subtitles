@@ -130,7 +130,6 @@ function App() {
   const [hotkeyDraft, setHotkeyDraft] = useState(DEFAULT_HOTKEY);
   const [sttProvider, setSttProvider] =
     useState<SttProvider>(DEFAULT_STT_PROVIDER);
-  const [sttApiKey, setSttApiKey] = useState("");
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
@@ -218,7 +217,6 @@ function App() {
     });
     window.subtitles.stt.getConfig().then((config) => {
       setSttProvider(config.provider ?? DEFAULT_STT_PROVIDER);
-      setSttApiKey(config.cloudApiKey ?? "");
       setSttConfigLoaded(true);
     });
     window.subtitles.llm.getConfig().then((config) => {
@@ -438,7 +436,6 @@ function App() {
     }
     window.subtitles.stt.setConfig({
       provider: sttProvider,
-      cloudApiKey: sttApiKey || undefined,
       ...overrides,
     });
   };
@@ -478,9 +475,6 @@ function App() {
     persistSttConfig({ provider });
   };
 
-  const handleApplySttApiKey = () => {
-    persistSttConfig({ cloudApiKey: sttApiKey || undefined });
-  };
 
   const handleLlmProviderChange = (provider: LlmProvider) => {
     setLlmProvider(provider);
@@ -578,27 +572,8 @@ function App() {
               <option value="cloud">Cloud (API key)</option>
             </select>
             <span className="field-hint">
-              Switches at runtime. Cloud requires an API key.
+              Switches at runtime. Cloud reads STT_CLOUD_API_KEY from env.
             </span>
-          </label>
-          <label className="field">
-            Cloud API key
-            <div className="hotkey-row">
-              <input
-                type="password"
-                value={sttApiKey}
-                onChange={(event) => setSttApiKey(event.target.value)}
-                placeholder="sk-..."
-              />
-              <button
-                className="ghost"
-                type="button"
-                onClick={handleApplySttApiKey}
-              >
-                Save
-              </button>
-            </div>
-            <span className="field-hint">Stored in memory for now.</span>
           </label>
           <label className="field">
             LLM provider

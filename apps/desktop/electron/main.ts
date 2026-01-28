@@ -246,12 +246,16 @@ const broadcastTranscript = (text: string, isFinal: boolean) => {
 
 const resolveLlmProvider = () => {
   if (llmConfig.provider === "openai") {
-    if (!llmConfig.apiKey) {
+    const apiKey = llmConfig.apiKey ?? process.env.OPENAI_API_KEY;
+    if (!apiKey) {
       throw new Error("OpenAI API key missing.");
     }
+    const model = llmConfig.model ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+    const baseUrl = process.env.OPENAI_BASE_URL;
     return new OpenAiLlmProvider({
-      apiKey: llmConfig.apiKey,
-      model: llmConfig.model ?? "gpt-4o-mini",
+      apiKey,
+      model,
+      baseUrl,
     });
   }
   return new LocalLlmProvider();
@@ -360,8 +364,13 @@ const canStartListening = () => {
     return false;
   }
   if (sttConfig.provider === "cloud" && !sttConfig.cloudApiKey) {
-    registerSttFailure("Cloud STT selected but API key is missing.");
-    return false;
+    const cloudKey = process.env.STT_CLOUD_API_KEY;
+    if (cloudKey) {
+      sttConfig = { ...sttConfig, cloudApiKey: cloudKey };
+    } else {
+      registerSttFailure("Cloud STT selected but API key is missing.");
+      return false;
+    }
   }
   return true;
 };
