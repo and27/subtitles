@@ -10,6 +10,7 @@ export type AppSettings = {
   latencyTargetMs?: number
   llmProvider?: 'local' | 'openai'
   llmModel?: string
+  llmMode?: 'coaching' | 'direct'
 }
 
 export interface SettingsRepositoryPort {

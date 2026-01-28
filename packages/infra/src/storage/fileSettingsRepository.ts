@@ -21,6 +21,7 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       latencyTargetMs: data.latencyTargetMs,
       llmProvider: data.llmProvider,
       llmModel: data.llmModel,
+      llmMode: data.llmMode,
     }
   }
 
@@ -46,6 +47,9 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
         }
         if (settings.llmModel) {
           data.llmModel = settings.llmModel
+        }
+        if (settings.llmMode) {
+          data.llmMode = settings.llmMode
         }
       },
       this.logger,

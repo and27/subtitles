@@ -131,6 +131,7 @@ function App() {
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
+  const [llmMode, setLlmMode] = useState<"coaching" | "direct">("coaching");
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -378,6 +379,7 @@ function App() {
       hotkey,
       audioMode,
       saveTranscript,
+      llmMode,
       ...overrides,
     });
   };
@@ -419,7 +421,7 @@ function App() {
     try {
       const response = await window.subtitles.llm.generate({
         question,
-        mode: "coaching",
+        mode: llmMode,
       });
       setLlmOutput(response);
     } catch (error) {
@@ -436,6 +438,11 @@ function App() {
   const handleSttProviderChange = (provider: SttProvider) => {
     setSttProvider(provider);
     persistSttConfig({ provider });
+  };
+
+  const handleLlmModeChange = (mode: "coaching" | "direct") => {
+    setLlmMode(mode);
+    persistSettings({ llmMode: mode });
   };
 
   return (
@@ -553,6 +560,18 @@ function App() {
             </div>
             <span className="field-hint">Set via LLM_PROVIDER</span>
           </div>
+          <label className="field">
+            Output mode
+            <select
+              value={llmMode}
+              onChange={(event) =>
+                handleLlmModeChange(event.target.value as "coaching" | "direct")
+              }
+            >
+              <option value="coaching">Coaching hints</option>
+              <option value="direct">Direct answer</option>
+            </select>
+          </label>
           <label className="field">
             Practice mode (manual)
             <textarea

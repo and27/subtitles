@@ -130,6 +130,7 @@ let llmConfig: LlmConfig = {
   provider: "local",
   model: "gpt-4o-mini",
 };
+let llmMode: "coaching" | "direct" = "coaching";
 let transcriptText = "";
 let transcriptTimer: NodeJS.Timeout | null = null;
 let sttMetrics: SttMetrics = {
@@ -190,6 +191,7 @@ const hydrateAppSettings = async () => {
     provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
     model: envModel ?? appSettings.llmModel ?? llmConfig.model,
   };
+  llmMode = appSettings.llmMode ?? llmMode;
 };
 
 const broadcastListeningState = () => {
@@ -327,7 +329,7 @@ const generateLlmHints = async (request: LlmRequest): Promise<LlmResponse> => {
   const provider = resolveLlmProvider();
   const response = await provider.generateHints({
     question: request.question,
-    mode: request.mode ?? "coaching",
+    mode: request.mode ?? llmMode,
     maxHints: 3,
   });
   return {
@@ -682,6 +684,7 @@ function registerIpcHandlers() {
       provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
       model: envModel ?? appSettings.llmModel ?? llmConfig.model,
     };
+    llmMode = appSettings.llmMode ?? llmMode;
     const activeScaffoldId = scaffoldRepository
       ? await scaffoldRepository.getActiveId()
       : appSettings.activeScaffoldId;
@@ -705,6 +708,7 @@ function registerIpcHandlers() {
         provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
         model: envModel ?? appSettings.llmModel ?? llmConfig.model,
       };
+      llmMode = appSettings.llmMode ?? llmMode;
 
       ensureRepositories();
       if (settingsRepository) {
@@ -716,6 +720,7 @@ function registerIpcHandlers() {
           latencyTargetMs: appSettings.latencyTargetMs,
           llmProvider: appSettings.llmProvider,
           llmModel: appSettings.llmModel,
+          llmMode: appSettings.llmMode,
         });
       }
       if (scaffoldRepository) {

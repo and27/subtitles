@@ -28,6 +28,7 @@ export const storeSchema = z.object({
   latencyTargetMs: z.number().default(1200),
   llmProvider: z.enum(['local', 'openai']).default('local'),
   llmModel: z.string().default('gpt-4o-mini'),
+  llmMode: z.enum(['coaching', 'direct']).default('coaching'),
 })
 
 export type StoreData = z.infer<typeof storeSchema>
