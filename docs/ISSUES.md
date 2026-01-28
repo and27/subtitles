@@ -490,136 +490,101 @@ Mantener respuesta near real-time bajo carga y con audio mixed.
 
 ---
 
-SUB-009 — Answer Scaffold Engine (matching básico)
-Objetivo
+## SUB-009 — LLM Hint Engine (intent + bullets)
 
-Implementar un motor simple que seleccione el scaffold correcto
-basado en intención (no contenido exacto).
+### Objetivo
 
-Alcance
+Generar hints concisos a partir de una pregunta (manual o transcript),
+usando un LLM configurable por adaptadores.
 
-Matching por:
+### Alcance
 
-triggers (keywords)
+- Entrada única: texto de pregunta (manual o STT)
+- Interpretación por LLM (no matching por keywords)
+- Respuesta corta: resumen + bullets de hints (no ensayo)
+- Idioma de salida = idioma de la pregunta
+- Overlay limitado a 7 líneas con paginación
+- Placeholder cuando no hay pregunta: “Ready to create”
+- Provider configurable (OpenAI/otros) vía adapter/port
 
-tags
+### Criterios de aceptación (DoD)
 
-Prioridad simple (primer match válido)
+- Dado un input textual, retorna resumen corto + 1–3 hints
+- No genera texto largo (máx 7 líneas en overlay)
+- Paginación funcional cuando excede 7 líneas
+- Idioma respeta el idioma de la pregunta
+- Provider intercambiable por adapter (sin lock-in)
 
-Input manual o transcript STT
+## SUB-010 — Manual “question intake” (practice mode)
 
-DoD
+### Objetivo
 
-Dado un input textual, devuelve 0–1 scaffold
+Permitir práctica sin audio: el usuario escribe una pregunta y recibe hints.
 
-No genera texto nuevo
+### Alcance
 
-Solo devuelve estructura + starters
+- Input manual en ControlWindow
+- Botón “Use as fallback” usa el mismo pipeline del LLM
+- Funciona sin listening activo
+- Overlay muestra resumen + hints (paginado)
 
-Vive en packages/core
+### Criterios de aceptación (DoD)
 
-SUB-010 — Manual “question intake” (practice mode)
-Objetivo
+- Flujo completo sin STT
+- Mismo resultado que si viniera del transcript
+- Overlay se actualiza en tiempo real al enviar manual
 
-Permitir practicar entrevistas sin STT:
-el usuario escribe o pega una pregunta
-y el sistema responde con scaffolding visual.
+## SUB-011 — Output modes (coaching vs direct)
 
-Alcance
+### Objetivo
 
-Input manual en ControlWindow
+Permitir elegir cómo se presenta el apoyo: coaching (hints) o directa (respuesta breve).
 
-Botón “Practice”
+### Alcance
 
-Overlay muestra scaffold sugerido
+- Toggle en UI: “Coaching hints” vs “Direct”
+- Coaching: resumen + bullets
+- Direct: respuesta breve y concisa (sin ensayo)
+- Respeta límite de 7 líneas y paginación
 
-DoD
+### Criterios de aceptación (DoD)
 
-Flujo completo sin audio
+- Toggle afecta el formato de salida del LLM
+- En ambos modos, salida es concisa y paginada
+- Persistencia del modo entre sesiones
 
-Overlay se actualiza correctamente
+## SUB-012 — Cognitive modes (visual safety)
 
-No requiere STT (funciona como fallback)
-
-SUB-011 — Cognitive modes (visual safety)
-Objetivo
+### Objetivo
 
 Reducir sobrecarga cognitiva con modos visuales predefinidos.
 
-Alcance
+### Alcance
 
-Modos:
+- Modos: Calm, Minimal, Focus
+- Cada modo ajusta: opacidad, tamaño, densidad (líneas visibles)
 
-Calm
+### Criterios de aceptación (DoD)
 
-Minimal
+- Cambio de modo es instantáneo
+- Overlay responde en tiempo real
+- Persisten entre sesiones
 
-Focus
+## SUB-013 — Session history (local)
 
-Cada modo ajusta:
+### Objetivo
 
-opacidad
+Guardar historial de preguntas y respuestas para revisión posterior.
 
-tamaño
+### Alcance
 
-cantidad de líneas visibles
+- Guardar siempre: pregunta, respuesta, timestamp
+- Sin audio
+- Vista básica de historial
+- Botón “Delete all” para borrar historial completo
 
-DoD
+### Criterios de aceptación (DoD)
 
-Cambiar modo es instantáneo
-
-Overlay responde en tiempo real
-
-Persisten entre sesiones
-
-SUB-012 — Anxiety-friendly flow (no-decision mode)
-Objetivo
-
-Reducir decisiones bajo estrés.
-
-Alcance
-
-Un solo botón: “Help me start”
-
-Muestra:
-
-1 starter phrase
-
-1 structure line
-
-Sin scroll
-
-Sin listas largas
-
-DoD
-
-Flujo usable con 1 click
-
-No muestra más de 2–3 elementos
-
-Pensado para freeze moments
-
-SUB-013 — Session memory (local, ephemeral)
-Objetivo
-
-Recordar qué pasó sin grabar ni juzgar.
-
-Alcance
-
-Guardar:
-
-qué scaffold se usó
-
-cuándo
-
-Sin audio
-
-Sin texto completo (salvo opt-in)
-
-DoD
-
-Se puede ver resumen post-sesión
-
-Datos se pueden borrar fácilmente
-
-No hay tracking oculto
+- Historial se guarda automáticamente
+- Se puede ver la lista de sesiones previas
+- Borrado total disponible desde UI
