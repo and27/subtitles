@@ -131,9 +131,6 @@ function App() {
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
-  const [latencyTargetMs, setLatencyTargetMs] = useState(
-    DEFAULT_LATENCY_TARGET_MS,
-  );
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -185,7 +182,7 @@ function App() {
         const preferredId =
           storedActiveId && items.some((item) => item.id === storedActiveId)
             ? storedActiveId
-            : items[0]?.id ?? "";
+            : (items[0]?.id ?? "");
         setActiveId(preferredId);
       }
       setScaffoldsLoaded(true);
@@ -204,9 +201,6 @@ function App() {
       setAudioMode(settings.audioMode ?? DEFAULT_AUDIO_MODE);
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY);
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY);
-      setLatencyTargetMs(
-        settings.latencyTargetMs ?? DEFAULT_LATENCY_TARGET_MS,
-      );
       setSaveTranscript(settings.saveTranscript ?? false);
       setSettingsLoaded(true);
     });
@@ -275,10 +269,10 @@ function App() {
 
   useEffect(() => {
     if (!settingsLoaded) {
-      return
+      return;
     }
-    persistSettings()
-  }, [overlayStyle])
+    persistSettings();
+  }, [overlayStyle]);
 
   useEffect(() => {
     if (!activeId) {
@@ -291,10 +285,10 @@ function App() {
     }
     const hasLlmOutput = llmText.trim().length > 0;
     const content = hasLlmOutput
-      ? overlayPages[overlayPageIndex] ?? llmText
+      ? (overlayPages[overlayPageIndex] ?? llmText)
       : listeningState.active
-      ? "Listening..."
-      : "Ready to create";
+        ? "Listening..."
+        : "Ready to create";
     window.subtitles.overlay.updateContent({ text: content });
     window.subtitles.overlay.show();
   }, [
@@ -384,7 +378,6 @@ function App() {
       hotkey,
       audioMode,
       saveTranscript,
-      latencyTargetMs,
       ...overrides,
     });
   };
@@ -406,14 +399,6 @@ function App() {
   const handleSaveTranscriptToggle = (enabled: boolean) => {
     setSaveTranscript(enabled);
     persistSettings({ saveTranscript: enabled });
-  };
-
-  const handleLatencyTargetChange = (value: number) => {
-    if (!Number.isFinite(value) || value <= 0) {
-      return;
-    }
-    setLatencyTargetMs(value);
-    persistSettings({ latencyTargetMs: value });
   };
 
   const backoffRemainingMs = sttStatus.backoffUntil
@@ -452,8 +437,6 @@ function App() {
     setSttProvider(provider);
     persistSttConfig({ provider });
   };
-
-
 
   return (
     <div className="app-shell">
@@ -524,37 +507,6 @@ function App() {
               Windows only for now. Toggle anytime.
             </span>
           </label>
-          <label className="field">
-            STT provider
-            <select
-              value={sttProvider}
-              onChange={(event) =>
-                handleSttProviderChange(event.target.value as SttProvider)
-              }
-            >
-              <option value="local">Local (offline)</option>
-              <option value="cloud">Cloud (API key)</option>
-            </select>
-            <span className="field-hint">
-              Switches at runtime. Cloud reads STT_CLOUD_API_KEY from env.
-            </span>
-          </label>
-          <label className="field">
-            Latency target (ms)
-            <input
-              type="number"
-              min={200}
-              max={5000}
-              step={50}
-              value={latencyTargetMs}
-              onChange={(event) =>
-                handleLatencyTargetChange(Number(event.target.value))
-              }
-            />
-            <span className="field-hint">
-              Used to flag late transcript updates.
-            </span>
-          </label>
           <div className="field metrics-card" aria-live="polite">
             <div className="metrics-row">
               <span>Last interval</span>
@@ -594,13 +546,20 @@ function App() {
               <p className="field-hint">Last error: {sttStatus.lastError}</p>
             ) : null}
           </div>
+          <div className="field">
+            <div className="metrics-row">
+              <span>LLM provider</span>
+              <strong>{llmProvider === "openai" ? "OpenAI" : "Local"}</strong>
+            </div>
+            <span className="field-hint">Set via LLM_PROVIDER</span>
+          </div>
           <label className="field">
-            Manual input (fallback)
+            Practice mode (manual)
             <textarea
               rows={3}
               value={transcriptDraft}
               onChange={(event) => setTranscriptDraft(event.target.value)}
-              placeholder="Type or paste a question to generate hints"
+              placeholder="Type or paste a question to practice"
             />
             <div className="field-actions">
               <button
@@ -616,7 +575,7 @@ function App() {
                 }}
                 disabled={transcriptDraft.trim().length === 0}
               >
-                Use as fallback
+                Practice
               </button>
               <button
                 className="ghost"
@@ -641,7 +600,7 @@ function App() {
               </button>
             </div>
             <span className="field-hint">
-              Use fallback anytime; simulate requires listening.
+              Works without listening. Simulate requires listening.
             </span>
           </label>
           <label className="field">
@@ -650,7 +609,9 @@ function App() {
               <input
                 type="checkbox"
                 checked={saveTranscript}
-                onChange={(event) => handleSaveTranscriptToggle(event.target.checked)}
+                onChange={(event) =>
+                  handleSaveTranscriptToggle(event.target.checked)
+                }
               />
               <span>Store transcript as TXT (audio is never saved)</span>
             </div>
