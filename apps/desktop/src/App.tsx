@@ -135,6 +135,7 @@ function App() {
   const sttRecorderRef = useRef<MediaRecorder | null>(null);
   const sttStreamRef = useRef<MediaStream | null>(null);
   const sttChunksRef = useRef<Blob[]>([]);
+  const sttFinalizeRef = useRef(false);
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -252,21 +253,28 @@ function App() {
   }, [overlayStyle]);
 
   useEffect(() => {
+    const flushFinalUpload = () => {
+      if (sttChunksRef.current.length === 0) {
+        return;
+      }
+      const blob = new Blob(sttChunksRef.current, { type: "audio/webm" });
+      sttChunksRef.current = [];
+      blob.arrayBuffer().then((buffer) => {
+        window.subtitles.stt.audioChunk({
+          data: buffer,
+          mimeType: blob.type || "audio/webm",
+          isFinal: true,
+        });
+      });
+    };
+
     const stopRecorder = (sendFinal: boolean) => {
       const recorder = sttRecorderRef.current;
       if (recorder && recorder.state !== "inactive") {
+        sttFinalizeRef.current = sendFinal;
         recorder.stop();
-      }
-      if (sendFinal && sttChunksRef.current.length > 0) {
-        const blob = new Blob(sttChunksRef.current, { type: "audio/webm" });
-        sttChunksRef.current = [];
-        blob.arrayBuffer().then((buffer) => {
-          window.subtitles.stt.audioChunk({
-            data: buffer,
-            mimeType: blob.type || "audio/webm",
-            isFinal: true,
-          });
-        });
+      } else if (sendFinal) {
+        flushFinalUpload();
       } else {
         sttChunksRef.current = [];
       }
@@ -300,6 +308,12 @@ function App() {
             return;
           }
           sttChunksRef.current.push(event.data);
+        };
+        recorder.onstop = () => {
+          if (sttFinalizeRef.current) {
+            sttFinalizeRef.current = false;
+            flushFinalUpload();
+          }
         };
         recorder.start();
         sttRecorderRef.current = recorder;

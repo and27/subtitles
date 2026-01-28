@@ -398,9 +398,7 @@ const transcribeWhisperChunk = async (
     return;
   }
   try {
-    console.log(`[stt] whisper upload bytes=${data.byteLength} mime=${mimeType}`);
     const text = await transcribeWhisper(data, mimeType);
-    console.log(`[stt] whisper result length=${text.length}`);
     if (text) {
       transcriptText = text;
       broadcastTranscript(transcriptText, true);
@@ -706,9 +704,6 @@ function registerIpcHandlers() {
         return;
       }
       const data = new Uint8Array(chunk.data);
-      console.log(
-        `[stt] cloud audioChunk bytes=${data.byteLength} final=${chunk.isFinal}`,
-      );
       void transcribeWhisperChunk(data, chunk.mimeType, chunk.isFinal);
     },
   );
