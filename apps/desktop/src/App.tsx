@@ -10,7 +10,6 @@ import type {
   SttProvider,
   SttRuntimeStatus,
   SttTranscript,
-  LlmConfig,
   LlmProvider,
   LlmResponse,
 } from "../ipc/contracts";
@@ -35,7 +34,6 @@ const DEFAULT_AUDIO_MODE: AudioCaptureMode = "system";
 const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
 const DEFAULT_STT_PROVIDER: SttProvider = "local";
 const DEFAULT_LLM_PROVIDER: LlmProvider = "local";
-const DEFAULT_LLM_MODEL = "gpt-4o-mini";
 const DEFAULT_LATENCY_TARGET_MS = 1200;
 
 const seedScaffolds: Scaffold[] = [
@@ -133,8 +131,6 @@ function App() {
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
-  const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
-  const [llmConfigLoaded, setLlmConfigLoaded] = useState(false);
   const [latencyTargetMs, setLatencyTargetMs] = useState(
     DEFAULT_LATENCY_TARGET_MS,
   );
@@ -220,8 +216,6 @@ function App() {
     });
     window.subtitles.llm.getConfig().then((config) => {
       setLlmProvider(config.provider ?? DEFAULT_LLM_PROVIDER);
-      setLlmModel(config.model ?? DEFAULT_LLM_MODEL);
-      setLlmConfigLoaded(true);
     });
     window.subtitles.stt.getMetrics().then((metrics) => {
       setSttMetrics(metrics);
@@ -391,8 +385,6 @@ function App() {
       audioMode,
       saveTranscript,
       latencyTargetMs,
-      llmProvider,
-      llmModel,
       ...overrides,
     });
   };
@@ -438,17 +430,6 @@ function App() {
     });
   };
 
-  const persistLlmConfig = (overrides: Partial<LlmConfig> = {}) => {
-    if (!llmConfigLoaded) {
-      return;
-    }
-    window.subtitles.llm.setConfig({
-      provider: llmProvider,
-      model: llmModel,
-      ...overrides,
-    });
-  };
-
   const requestLlmHints = async (question: string) => {
     try {
       const response = await window.subtitles.llm.generate({
@@ -472,17 +453,6 @@ function App() {
     persistSttConfig({ provider });
   };
 
-
-  const handleLlmProviderChange = (provider: LlmProvider) => {
-    setLlmProvider(provider);
-    persistSettings({ llmProvider: provider });
-    persistLlmConfig({ provider });
-  };
-
-  const handleApplyLlmModel = () => {
-    persistSettings({ llmModel });
-    persistLlmConfig({ model: llmModel });
-  };
 
 
   return (
@@ -568,39 +538,6 @@ function App() {
             <span className="field-hint">
               Switches at runtime. Cloud reads STT_CLOUD_API_KEY from env.
             </span>
-          </label>
-          <label className="field">
-            LLM provider
-            <select
-              value={llmProvider}
-              onChange={(event) =>
-                handleLlmProviderChange(event.target.value as LlmProvider)
-              }
-            >
-              <option value="local">Local (fallback)</option>
-              <option value="openai">OpenAI</option>
-            </select>
-            <span className="field-hint">
-              Controls how hints are generated.
-            </span>
-          </label>
-          <label className="field">
-            LLM model
-            <div className="hotkey-row">
-              <input
-                type="text"
-                value={llmModel}
-                onChange={(event) => setLlmModel(event.target.value)}
-                placeholder={DEFAULT_LLM_MODEL}
-              />
-              <button
-                className="ghost"
-                type="button"
-                onClick={handleApplyLlmModel}
-              >
-                Apply
-              </button>
-            </div>
           </label>
           <label className="field">
             Latency target (ms)

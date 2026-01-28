@@ -139,10 +139,12 @@ const hydrateAppSettings = async () => {
     ...listeningState,
     audioMode: appSettings.audioMode,
   };
+  const envProvider = resolveEnvLlmProvider();
+  const envModel = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL;
   llmConfig = {
     ...llmConfig,
-    provider: appSettings.llmProvider ?? llmConfig.provider,
-    model: appSettings.llmModel ?? llmConfig.model,
+    provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
+    model: envModel ?? appSettings.llmModel ?? llmConfig.model,
   };
 };
 
@@ -244,13 +246,25 @@ const broadcastTranscript = (text: string, isFinal: boolean) => {
   }
 };
 
+const resolveEnvLlmProvider = (): LlmProvider | null => {
+  const raw = process.env.LLM_PROVIDER?.trim().toLowerCase();
+  if (raw === "local" || raw === "openai") {
+    return raw;
+  }
+  return null;
+};
+
 const resolveLlmProvider = () => {
   if (llmConfig.provider === "openai") {
     const apiKey = llmConfig.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new Error("OpenAI API key missing.");
     }
-    const model = llmConfig.model ?? process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+    const model =
+      llmConfig.model ??
+      process.env.OPENAI_MODEL ??
+      process.env.LLM_MODEL ??
+      "gpt-4o-mini";
     const baseUrl = process.env.OPENAI_BASE_URL;
     return new OpenAiLlmProvider({
       apiKey,
@@ -613,10 +627,12 @@ function registerIpcHandlers() {
         ...settings,
       };
     }
+    const envProvider = resolveEnvLlmProvider();
+    const envModel = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL;
     llmConfig = {
       ...llmConfig,
-      provider: appSettings.llmProvider ?? llmConfig.provider,
-      model: appSettings.llmModel ?? llmConfig.model,
+      provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
+      model: envModel ?? appSettings.llmModel ?? llmConfig.model,
     };
     const activeScaffoldId = scaffoldRepository
       ? await scaffoldRepository.getActiveId()
@@ -634,10 +650,12 @@ function registerIpcHandlers() {
       const prevAudioMode = appSettings.audioMode;
       const prevSaveTranscript = appSettings.saveTranscript;
       appSettings = { ...appSettings, ...next };
+      const envProvider = resolveEnvLlmProvider();
+      const envModel = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL;
       llmConfig = {
         ...llmConfig,
-        provider: appSettings.llmProvider ?? llmConfig.provider,
-        model: appSettings.llmModel ?? llmConfig.model,
+        provider: envProvider ?? appSettings.llmProvider ?? llmConfig.provider,
+        model: envModel ?? appSettings.llmModel ?? llmConfig.model,
       };
 
       ensureRepositories();
