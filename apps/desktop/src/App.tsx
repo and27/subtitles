@@ -595,12 +595,12 @@ function App() {
             ) : null}
           </div>
           <label className="field">
-            Manual input (fallback)
+            Practice mode (manual)
             <textarea
               rows={3}
               value={transcriptDraft}
               onChange={(event) => setTranscriptDraft(event.target.value)}
-              placeholder="Type or paste a question to generate hints"
+              placeholder="Type or paste a question to practice"
             />
             <div className="field-actions">
               <button
@@ -616,7 +616,7 @@ function App() {
                 }}
                 disabled={transcriptDraft.trim().length === 0}
               >
-                Use as fallback
+                Practice
               </button>
               <button
                 className="ghost"
@@ -641,7 +641,7 @@ function App() {
               </button>
             </div>
             <span className="field-hint">
-              Use fallback anytime; simulate requires listening.
+              Works without listening. Simulate requires listening.
             </span>
           </label>
           <label className="field">
