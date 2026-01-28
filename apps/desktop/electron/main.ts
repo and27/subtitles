@@ -97,6 +97,8 @@ let win: BrowserWindow | null;
 let overlayWin: BrowserWindow | null;
 
 let overlayClickThrough = true;
+let overlayDragMode = false;
+let overlayClickThroughBeforeDrag: boolean | null = null;
 
 const defaultOverlayStyle: OverlayStyle = {
   opacity: 0.9,
@@ -202,6 +204,20 @@ const hydrateAppSettings = async () => {
 const broadcastListeningState = () => {
   win?.webContents.send(IPC_CHANNELS.listening.state, listeningState);
   overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState);
+};
+
+const broadcastOverlayPosition = () => {
+  if (!appSettings.overlayPosition) {
+    return;
+  }
+  overlayWin?.webContents.send(
+    IPC_CHANNELS.overlay.position,
+    appSettings.overlayPosition,
+  );
+};
+
+const broadcastOverlayDragMode = () => {
+  overlayWin?.webContents.send(IPC_CHANNELS.overlay.dragMode, overlayDragMode);
 };
 
 const broadcastSttMetrics = () => {
@@ -632,6 +648,11 @@ function createOverlayWindow() {
     overlayWin.loadFile(path.join(RENDERER_DIST, "overlay.html"));
   }
 
+  overlayWin.webContents.on("did-finish-load", () => {
+    broadcastOverlayPosition();
+    broadcastOverlayDragMode();
+  });
+
   overlayWin.on("closed", () => {
     overlayWin = null;
   });
@@ -672,7 +693,44 @@ function registerIpcHandlers() {
     IPC_CHANNELS.overlay.setClickThrough,
     (_event, enabled: boolean) => {
       overlayClickThrough = enabled;
+      if (!overlayDragMode) {
+        overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
+      }
+    },
+  );
+  ipcMain.on(IPC_CHANNELS.overlay.setDragMode, (_event, enabled: boolean) => {
+    overlayDragMode = enabled;
+    if (enabled) {
+      overlayClickThroughBeforeDrag = overlayClickThrough;
+      overlayWin?.setIgnoreMouseEvents(false);
+    } else {
+      if (overlayClickThroughBeforeDrag !== null) {
+        overlayClickThrough = overlayClickThroughBeforeDrag;
+      }
+      overlayClickThroughBeforeDrag = null;
       overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
+    }
+    broadcastOverlayDragMode();
+  });
+  ipcMain.on(
+    IPC_CHANNELS.overlay.setPosition,
+    async (_event, position: { x: number; y: number }) => {
+      appSettings = { ...appSettings, overlayPosition: position };
+      ensureRepositories();
+      if (settingsRepository) {
+        await settingsRepository.save({
+          overlayStyle: appSettings.overlayStyle,
+          overlayPosition: appSettings.overlayPosition,
+          audioMode: appSettings.audioMode,
+          hotkey: appSettings.hotkey,
+          saveTranscript: appSettings.saveTranscript,
+          latencyTargetMs: appSettings.latencyTargetMs,
+          llmProvider: appSettings.llmProvider,
+          llmModel: appSettings.llmModel,
+          llmMode: appSettings.llmMode,
+        });
+      }
+      broadcastOverlayPosition();
     },
   );
 
@@ -810,6 +868,7 @@ function registerIpcHandlers() {
       if (settingsRepository) {
         await settingsRepository.save({
           overlayStyle: appSettings.overlayStyle,
+          overlayPosition: appSettings.overlayPosition,
           audioMode: appSettings.audioMode,
           hotkey: appSettings.hotkey,
           saveTranscript: appSettings.saveTranscript,

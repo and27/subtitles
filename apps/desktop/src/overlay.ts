@@ -10,13 +10,25 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max)
 
 let currentPositionY = 0.2
+let dragEnabled = false
+let dragPosition: { x: number; y: number } | null = null
+let dragOffset = { x: 0, y: 0 }
+let isDragging = false
 
 const applyPosition = () => {
+  if (dragPosition) {
+    root.style.left = `${dragPosition.x}px`
+    root.style.top = `${dragPosition.y}px`
+    root.style.transform = 'none'
+    return
+  }
   const contentHeight = contentEl.getBoundingClientRect().height
   const viewportHeight = window.innerHeight
   const maxTop = Math.max(0, viewportHeight - contentHeight - 16)
   const top = Math.round(maxTop * currentPositionY)
   root.style.top = `${top}px`
+  root.style.left = '50%'
+  root.style.transform = 'translateX(-50%)'
 }
 
 const applyStyle = (style: Partial<{
@@ -69,6 +81,67 @@ window.subtitles.onOverlayStyle((style) => {
   applyStyle(style)
 })
 
+const clampDragPosition = (x: number, y: number) => {
+  const rect = root.getBoundingClientRect()
+  const maxX = Math.max(0, window.innerWidth - rect.width - 8)
+  const maxY = Math.max(0, window.innerHeight - rect.height - 8)
+  return {
+    x: clamp(x, 8, maxX),
+    y: clamp(y, 8, maxY),
+  }
+}
+
+const handlePointerDown = (event: PointerEvent) => {
+  if (!dragEnabled) {
+    return
+  }
+  isDragging = true
+  const rect = root.getBoundingClientRect()
+  dragOffset = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
+  root.setPointerCapture(event.pointerId)
+}
+
+const handlePointerMove = (event: PointerEvent) => {
+  if (!dragEnabled || !isDragging) {
+    return
+  }
+  const next = clampDragPosition(
+    event.clientX - dragOffset.x,
+    event.clientY - dragOffset.y,
+  )
+  dragPosition = next
+  applyPosition()
+}
+
+const handlePointerUp = (event: PointerEvent) => {
+  if (!dragEnabled || !isDragging) {
+    return
+  }
+  isDragging = false
+  root.releasePointerCapture(event.pointerId)
+  if (dragPosition) {
+    window.subtitles.overlay.setPosition(dragPosition)
+  }
+}
+
+root.addEventListener('pointerdown', handlePointerDown)
+root.addEventListener('pointermove', handlePointerMove)
+root.addEventListener('pointerup', handlePointerUp)
+root.addEventListener('pointerleave', handlePointerUp)
+
 window.subtitles.onListeningState((state) => {
   renderListeningState(state.active)
+})
+
+window.subtitles.onOverlayPosition((position) => {
+  dragPosition = position
+  applyPosition()
+})
+
+window.subtitles.onOverlayDragMode((enabled) => {
+  dragEnabled = enabled
+  document.body.classList.toggle('drag-enabled', enabled)
 })

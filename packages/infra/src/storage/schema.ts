@@ -9,6 +9,11 @@ const overlayStyleSchema = z.object({
   positionY: z.number(),
 })
 
+const overlayPositionSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+})
+
 const scaffoldSchema = z.object({
   id: z.string(),
   triggers: z.array(z.string()),
@@ -22,6 +27,7 @@ export const storeSchema = z.object({
   scaffolds: z.array(scaffoldSchema),
   activeScaffoldId: z.string().nullable(),
   overlayStyle: overlayStyleSchema,
+  overlayPosition: overlayPositionSchema.optional(),
   audioMode: audioModeSchema,
   hotkey: z.string().default('CommandOrControl+Shift+Space'),
   saveTranscript: z.boolean().default(false),

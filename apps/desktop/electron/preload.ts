@@ -3,6 +3,7 @@ import {
   IPC_CHANNELS,
   type OverlayContent,
   type OverlayStyle,
+  type OverlayPosition,
   type Scaffold,
   type AppSettings,
   type ListeningState,
@@ -26,6 +27,10 @@ const subtitles: SubtitlesAPI = {
       ipcRenderer.send(IPC_CHANNELS.overlay.updateStyle, style),
     setClickThrough: (enabled: boolean) =>
       ipcRenderer.send(IPC_CHANNELS.overlay.setClickThrough, enabled),
+    setDragMode: (enabled: boolean) =>
+      ipcRenderer.send(IPC_CHANNELS.overlay.setDragMode, enabled),
+    setPosition: (position: OverlayPosition) =>
+      ipcRenderer.send(IPC_CHANNELS.overlay.setPosition, position),
   },
   scaffolds: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.scaffolds.list),
@@ -85,6 +90,22 @@ const subtitles: SubtitlesAPI = {
     ) => listener(style);
     ipcRenderer.on(IPC_CHANNELS.overlay.style, handler);
     return () => ipcRenderer.off(IPC_CHANNELS.overlay.style, handler);
+  },
+  onOverlayPosition: (listener) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      position: OverlayPosition,
+    ) => listener(position);
+    ipcRenderer.on(IPC_CHANNELS.overlay.position, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.position, handler);
+  },
+  onOverlayDragMode: (listener) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      enabled: boolean,
+    ) => listener(enabled);
+    ipcRenderer.on(IPC_CHANNELS.overlay.dragMode, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.dragMode, handler);
   },
   onListeningState: (listener) => {
     const handler = (

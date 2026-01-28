@@ -15,6 +15,7 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
     const data = await loadStore(this.filePath, this.logger)
     return {
       overlayStyle: data.overlayStyle,
+      overlayPosition: data.overlayPosition,
       audioMode: data.audioMode,
       hotkey: data.hotkey,
       saveTranscript: data.saveTranscript,
@@ -30,6 +31,9 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       this.filePath,
       (data) => {
         data.overlayStyle = settings.overlayStyle
+        if (settings.overlayPosition) {
+          data.overlayPosition = settings.overlayPosition
+        }
         if (settings.audioMode) {
           data.audioMode = settings.audioMode
         }

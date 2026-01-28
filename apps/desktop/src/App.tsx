@@ -120,6 +120,7 @@ function App() {
   );
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [overlayDragMode, setOverlayDragMode] = useState(false);
   const [audioMode, setAudioMode] =
     useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE);
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY);
@@ -507,6 +508,12 @@ function App() {
     persistSettings({ llmMode: mode });
   };
 
+  const handleToggleDragMode = () => {
+    const next = !overlayDragMode;
+    setOverlayDragMode(next);
+    window.subtitles.overlay.setDragMode(next);
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -526,6 +533,14 @@ function App() {
               onChange={(event) => setOverlayVisible(event.target.checked)}
             />
             <span>Overlay visible</span>
+          </label>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={overlayDragMode}
+              onChange={handleToggleDragMode}
+            />
+            <span>Move overlay</span>
           </label>
           <div
             className={`status-badge ${listeningState.active ? "is-on" : "is-off"}`}

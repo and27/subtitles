@@ -5,8 +5,12 @@ export const IPC_CHANNELS = {
     updateContent: 'overlay:updateContent',
     updateStyle: 'overlay:updateStyle',
     setClickThrough: 'overlay:setClickThrough',
+    setDragMode: 'overlay:setDragMode',
+    setPosition: 'overlay:setPosition',
     content: 'overlay:content',
     style: 'overlay:style',
+    dragMode: 'overlay:dragMode',
+    position: 'overlay:position',
   },
   listening: {
     start: 'listening:start',
@@ -59,6 +63,11 @@ export type OverlayStyle = {
   positionY: number
 }
 
+export type OverlayPosition = {
+  x: number
+  y: number
+}
+
 export type AudioCaptureMode = 'mic' | 'system' | 'mixed'
 
 export type Scaffold = {
@@ -76,6 +85,7 @@ export type AppSettings = {
   audioMode: AudioCaptureMode
   saveTranscript?: boolean
   latencyTargetMs?: number
+  overlayPosition?: OverlayPosition
   llmProvider?: LlmProvider
   llmModel?: string
   llmMode?: LlmMode
@@ -146,6 +156,8 @@ export type Unsubscribe = () => void
 
 export type OverlayContentListener = (content: OverlayContent) => void
 export type OverlayStyleListener = (style: Partial<OverlayStyle>) => void
+export type OverlayPositionListener = (position: OverlayPosition) => void
+export type OverlayDragModeListener = (enabled: boolean) => void
 export type ListeningStateListener = (state: ListeningState) => void
 export type SttTranscriptListener = (transcript: SttTranscript) => void
 export type SttMetricsListener = (metrics: SttMetrics) => void
@@ -158,6 +170,8 @@ export interface SubtitlesAPI {
     updateContent: (content: OverlayContent) => void
     updateStyle: (style: Partial<OverlayStyle>) => void
     setClickThrough: (enabled: boolean) => void
+    setDragMode: (enabled: boolean) => void
+    setPosition: (position: OverlayPosition) => void
   }
   scaffolds: {
     list: () => Promise<Scaffold[]>
@@ -195,6 +209,8 @@ export interface SubtitlesAPI {
   }
   onOverlayContent: (listener: OverlayContentListener) => Unsubscribe
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
+  onOverlayPosition: (listener: OverlayPositionListener) => Unsubscribe
+  onOverlayDragMode: (listener: OverlayDragModeListener) => Unsubscribe
   onListeningState: (listener: ListeningStateListener) => Unsubscribe
   onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
   onSttMetrics: (listener: SttMetricsListener) => Unsubscribe
