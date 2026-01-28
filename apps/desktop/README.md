@@ -37,3 +37,19 @@ its binary during `pnpm install`. If Electron still fails to run, retry:
 ```bash
 pnpm -C apps/desktop postinstall
 ```
+
+## Windows installer
+
+Build the Windows installer from the repo root:
+
+```bash
+pnpm -C apps/desktop build
+```
+
+Artifacts are written to:
+
+```
+apps/desktop/release/<version>/Subtitles-Windows-<version>-Setup.exe
+```
+
+The installer creates a Start Menu entry and a Desktop shortcut.
