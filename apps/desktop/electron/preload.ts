@@ -10,6 +10,9 @@ import {
   type SttTranscript,
   type SttMetrics,
   type SttRuntimeStatus,
+  type LlmConfig,
+  type LlmRequest,
+  type LlmResponse,
   type SubtitlesAPI,
 } from '../ipc/contracts'
 
@@ -54,6 +57,11 @@ const subtitles: SubtitlesAPI = {
     clear: () => ipcRenderer.send(IPC_CHANNELS.stt.clear),
     getMetrics: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getMetrics),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getStatus),
+  },
+  llm: {
+    getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.llm.getConfig),
+    setConfig: (config: LlmConfig) => ipcRenderer.invoke(IPC_CHANNELS.llm.setConfig, config),
+    generate: (request: LlmRequest) => ipcRenderer.invoke(IPC_CHANNELS.llm.generate, request),
   },
   onOverlayContent: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, content: OverlayContent) =>

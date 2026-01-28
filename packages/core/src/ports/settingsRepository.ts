@@ -8,6 +8,8 @@ export type AppSettings = {
   hotkey?: string
   saveTranscript?: boolean
   latencyTargetMs?: number
+  llmProvider?: 'local' | 'openai'
+  llmModel?: string
 }
 
 export interface SettingsRepositoryPort {

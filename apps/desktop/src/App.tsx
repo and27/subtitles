@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { generateAnswerHints } from "core";
 import type {
   AppSettings,
   AudioCaptureMode,
@@ -11,6 +10,9 @@ import type {
   SttProvider,
   SttRuntimeStatus,
   SttTranscript,
+  LlmConfig,
+  LlmProvider,
+  LlmResponse,
 } from "../ipc/contracts";
 import "./App.css";
 
@@ -32,6 +34,8 @@ const DEFAULT_STYLE: OverlayStyle = {
 const DEFAULT_AUDIO_MODE: AudioCaptureMode = "system";
 const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
 const DEFAULT_STT_PROVIDER: SttProvider = "local";
+const DEFAULT_LLM_PROVIDER: LlmProvider = "local";
+const DEFAULT_LLM_MODEL = "gpt-4o-mini";
 const DEFAULT_LATENCY_TARGET_MS = 1200;
 
 const seedScaffolds: Scaffold[] = [
@@ -86,31 +90,22 @@ const fromDraft = (draft: ScaffoldDraft): Scaffold => ({
 const scaffoldTitle = (scaffold: Scaffold) =>
   scaffold.triggers[0] ?? scaffold.tags?.[0] ?? "Untitled scaffold";
 
-const buildOverlayText = (
-  scaffold: Scaffold,
-  transcript: string,
-  hints: string[],
-) => {
-  const lines: string[] = [];
+const OVERLAY_PAGE_LINES = 7;
 
-  if (transcript) {
-    lines.push(transcript);
+const paginateLines = (text: string, maxLines: number): string[] => {
+  const lines = text.split(/\r?\n/);
+  const hasContent = lines.some((line) => line.trim().length > 0);
+  if (!hasContent) {
+    return [""];
   }
-
-  if (scaffold.structure.length > 0) {
-    lines.push(scaffold.structure.map((item) => `• ${item}`).join("\n"));
+  if (lines.length <= maxLines) {
+    return [lines.join("\n")];
   }
-  if (scaffold.starterPhrases.length > 0) {
-    lines.push(scaffold.starterPhrases.join("\n"));
+  const pages: string[] = [];
+  for (let i = 0; i < lines.length; i += maxLines) {
+    pages.push(lines.slice(i, i + maxLines).join("\n"));
   }
-
-  if (hints.length > 0) {
-    lines.push(`Hints:\n${hints.map((hint) => `• ${hint}`).join("\n")}`);
-  }
-
-  return (
-    lines.join("\n\n") || "Add structure or starter phrases to display here."
-  );
+  return pages;
 };
 
 function App() {
@@ -129,7 +124,6 @@ function App() {
   );
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const lastOverlayContentRef = useRef("");
   const [audioMode, setAudioMode] =
     useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE);
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY);
@@ -138,6 +132,11 @@ function App() {
     useState<SttProvider>(DEFAULT_STT_PROVIDER);
   const [sttApiKey, setSttApiKey] = useState("");
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
+  const [llmProvider, setLlmProvider] =
+    useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
+  const [llmModel, setLlmModel] = useState(DEFAULT_LLM_MODEL);
+  const [llmApiKey, setLlmApiKey] = useState("");
+  const [llmConfigLoaded, setLlmConfigLoaded] = useState(false);
   const [latencyTargetMs, setLatencyTargetMs] = useState(
     DEFAULT_LATENCY_TARGET_MS,
   );
@@ -151,6 +150,8 @@ function App() {
     updatedAt: 0,
   });
   const [transcriptDraft, setTranscriptDraft] = useState("");
+  const [llmOutput, setLlmOutput] = useState<LlmResponse | null>(null);
+  const lastLlmQuestionRef = useRef("");
   const [sttMetrics, setSttMetrics] = useState<SttMetrics>({
     totalUpdates: 0,
     lateUpdates: 0,
@@ -169,10 +170,12 @@ function App() {
   const [storedActiveId, setStoredActiveId] = useState<string | null>(null);
 
   const activeDraft = useMemo(() => fromDraft(draft), [draft]);
-  const hints = useMemo(
-    () => generateAnswerHints(transcript.text, activeDraft, { maxHints: 3 }),
-    [transcript.text, activeDraft],
+  const llmText = llmOutput?.text ?? "";
+  const overlayPages = useMemo(
+    () => paginateLines(llmText, OVERLAY_PAGE_LINES),
+    [llmText],
   );
+  const [overlayPageIndex, setOverlayPageIndex] = useState(0);
 
   useEffect(() => {
     const active = scaffolds.find((item) => item.id === activeId);
@@ -218,6 +221,12 @@ function App() {
       setSttApiKey(config.cloudApiKey ?? "");
       setSttConfigLoaded(true);
     });
+    window.subtitles.llm.getConfig().then((config) => {
+      setLlmProvider(config.provider ?? DEFAULT_LLM_PROVIDER);
+      setLlmModel(config.model ?? DEFAULT_LLM_MODEL);
+      setLlmApiKey(config.apiKey ?? "");
+      setLlmConfigLoaded(true);
+    });
     window.subtitles.stt.getMetrics().then((metrics) => {
       setSttMetrics(metrics);
     });
@@ -254,6 +263,17 @@ function App() {
   }, [overlayStyle]);
 
   useEffect(() => {
+    setOverlayPageIndex(0);
+    if (overlayPages.length <= 1) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setOverlayPageIndex((prev) => (prev + 1) % overlayPages.length);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [overlayPages.length, llmText]);
+
+  useEffect(() => {
     if (!settingsLoaded || !scaffoldsLoaded) {
       return;
     }
@@ -274,31 +294,39 @@ function App() {
     if (!activeId) {
       return;
     }
-    const hasTranscript = transcript.text.trim().length > 0;
-    const isListening = listeningState.active;
     if (!overlayVisible) {
       window.subtitles.overlay.updateContent({ text: "" });
       window.subtitles.overlay.hide();
       return;
     }
-    const content = hasTranscript
-      ? buildOverlayText(activeDraft, transcript.text, hints)
-      : isListening
+    const hasLlmOutput = llmText.trim().length > 0;
+    const content = hasLlmOutput
+      ? overlayPages[overlayPageIndex] ?? llmText
+      : listeningState.active
       ? "Listening..."
-      : lastOverlayContentRef.current || "How can I help you today?";
-    if (hasTranscript) {
-      lastOverlayContentRef.current = content;
-    }
+      : "Ready to create";
     window.subtitles.overlay.updateContent({ text: content });
     window.subtitles.overlay.show();
   }, [
-    activeDraft,
     activeId,
     overlayVisible,
     listeningState.active,
-    transcript.text,
-    hints,
+    llmText,
+    overlayPages,
+    overlayPageIndex,
   ]);
+
+  useEffect(() => {
+    const question = transcript.text.trim();
+    if (!question || !transcript.isFinal) {
+      return;
+    }
+    if (lastLlmQuestionRef.current === question) {
+      return;
+    }
+    lastLlmQuestionRef.current = question;
+    void requestLlmHints(question);
+  }, [transcript.text, transcript.isFinal]);
 
   const handleCreate = () => {
     const id = crypto.randomUUID?.() ?? `scaffold-${Date.now()}`;
@@ -367,6 +395,8 @@ function App() {
       audioMode,
       saveTranscript,
       latencyTargetMs,
+      llmProvider,
+      llmModel,
       ...overrides,
     });
   };
@@ -413,6 +443,36 @@ function App() {
     });
   };
 
+  const persistLlmConfig = (overrides: Partial<LlmConfig> = {}) => {
+    if (!llmConfigLoaded) {
+      return;
+    }
+    window.subtitles.llm.setConfig({
+      provider: llmProvider,
+      model: llmModel,
+      apiKey: llmApiKey || undefined,
+      ...overrides,
+    });
+  };
+
+  const requestLlmHints = async (question: string) => {
+    try {
+      const response = await window.subtitles.llm.generate({
+        question,
+        mode: "coaching",
+      });
+      setLlmOutput(response);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to generate hints.";
+      setLlmOutput({
+        text: `Unable to generate hints.\n${message}`,
+        updatedAt: Date.now(),
+        provider: llmProvider,
+      });
+    }
+  };
+
   const handleSttProviderChange = (provider: SttProvider) => {
     setSttProvider(provider);
     persistSttConfig({ provider });
@@ -420,6 +480,21 @@ function App() {
 
   const handleApplySttApiKey = () => {
     persistSttConfig({ cloudApiKey: sttApiKey || undefined });
+  };
+
+  const handleLlmProviderChange = (provider: LlmProvider) => {
+    setLlmProvider(provider);
+    persistSettings({ llmProvider: provider });
+    persistLlmConfig({ provider });
+  };
+
+  const handleApplyLlmModel = () => {
+    persistSettings({ llmModel });
+    persistLlmConfig({ model: llmModel });
+  };
+
+  const handleApplyLlmApiKey = () => {
+    persistLlmConfig({ apiKey: llmApiKey || undefined });
   };
 
   return (
@@ -526,6 +601,58 @@ function App() {
             <span className="field-hint">Stored in memory for now.</span>
           </label>
           <label className="field">
+            LLM provider
+            <select
+              value={llmProvider}
+              onChange={(event) =>
+                handleLlmProviderChange(event.target.value as LlmProvider)
+              }
+            >
+              <option value="local">Local (fallback)</option>
+              <option value="openai">OpenAI</option>
+            </select>
+            <span className="field-hint">
+              Controls how hints are generated.
+            </span>
+          </label>
+          <label className="field">
+            LLM model
+            <div className="hotkey-row">
+              <input
+                type="text"
+                value={llmModel}
+                onChange={(event) => setLlmModel(event.target.value)}
+                placeholder={DEFAULT_LLM_MODEL}
+              />
+              <button
+                className="ghost"
+                type="button"
+                onClick={handleApplyLlmModel}
+              >
+                Apply
+              </button>
+            </div>
+          </label>
+          <label className="field">
+            LLM API key
+            <div className="hotkey-row">
+              <input
+                type="password"
+                value={llmApiKey}
+                onChange={(event) => setLlmApiKey(event.target.value)}
+                placeholder="sk-..."
+              />
+              <button
+                className="ghost"
+                type="button"
+                onClick={handleApplyLlmApiKey}
+              >
+                Save
+              </button>
+            </div>
+            <span className="field-hint">Stored in memory only.</span>
+          </label>
+          <label className="field">
             Latency target (ms)
             <input
               type="number"
@@ -592,7 +719,14 @@ function App() {
               <button
                 className="ghost"
                 type="button"
-                onClick={() => window.subtitles.stt.manual(transcriptDraft)}
+                onClick={() => {
+                  const question = transcriptDraft.trim();
+                  if (!question) {
+                    return;
+                  }
+                  lastLlmQuestionRef.current = question;
+                  void requestLlmHints(question);
+                }}
                 disabled={transcriptDraft.trim().length === 0}
               >
                 Use as fallback
@@ -610,7 +744,11 @@ function App() {
               <button
                 className="ghost"
                 type="button"
-                onClick={() => window.subtitles.stt.clear()}
+                onClick={() => {
+                  window.subtitles.stt.clear();
+                  setLlmOutput(null);
+                  lastLlmQuestionRef.current = "";
+                }}
               >
                 Clear
               </button>

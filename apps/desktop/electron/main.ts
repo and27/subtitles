@@ -5,6 +5,8 @@ import fs from "node:fs/promises";
 import {
   FileScaffoldRepository,
   FileSettingsRepository,
+  LocalLlmProvider,
+  OpenAiLlmProvider,
   type StoreLogger,
 } from "infra";
 import {
@@ -19,6 +21,10 @@ import {
   type SttMetrics,
   type SttRuntimeStatus,
   type SttTranscript,
+  type LlmConfig,
+  type LlmRequest,
+  type LlmResponse,
+  type LlmProvider,
 } from "../ipc/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +68,8 @@ const defaultSettings: AppSettings = {
   audioMode: "system",
   saveTranscript: false,
   latencyTargetMs: 1200,
+  llmProvider: "local",
+  llmModel: "gpt-4o-mini",
 };
 
 let appSettings: AppSettings = { ...defaultSettings };
@@ -73,6 +81,10 @@ let registeredHotkey: string | null = null;
 let overlayVisibilityBeforeListening: boolean | null = null;
 let sttConfig: SttConfig = {
   provider: "local",
+};
+let llmConfig: LlmConfig = {
+  provider: "local",
+  model: "gpt-4o-mini",
 };
 let transcriptText = "";
 let transcriptTimer: NodeJS.Timeout | null = null;
@@ -126,6 +138,11 @@ const hydrateAppSettings = async () => {
   listeningState = {
     ...listeningState,
     audioMode: appSettings.audioMode,
+  };
+  llmConfig = {
+    ...llmConfig,
+    provider: appSettings.llmProvider ?? llmConfig.provider,
+    model: appSettings.llmModel ?? llmConfig.model,
   };
 };
 
@@ -225,6 +242,33 @@ const broadcastTranscript = (text: string, isFinal: boolean) => {
   if (appSettings.saveTranscript && text.trim().length > 0 && isFinal) {
     void saveTranscriptToFile(text);
   }
+};
+
+const resolveLlmProvider = () => {
+  if (llmConfig.provider === "openai") {
+    if (!llmConfig.apiKey) {
+      throw new Error("OpenAI API key missing.");
+    }
+    return new OpenAiLlmProvider({
+      apiKey: llmConfig.apiKey,
+      model: llmConfig.model ?? "gpt-4o-mini",
+    });
+  }
+  return new LocalLlmProvider();
+};
+
+const generateLlmHints = async (request: LlmRequest): Promise<LlmResponse> => {
+  const provider = resolveLlmProvider();
+  const response = await provider.generateHints({
+    question: request.question,
+    mode: request.mode ?? "coaching",
+    maxHints: 3,
+  });
+  return {
+    text: response.text,
+    updatedAt: Date.now(),
+    provider: llmConfig.provider as LlmProvider,
+  };
 };
 
 const clearTranscript = () => {
@@ -508,6 +552,14 @@ function registerIpcHandlers() {
     await clearSavedTranscriptFile();
   });
 
+  ipcMain.handle(IPC_CHANNELS.llm.getConfig, async () => llmConfig);
+  ipcMain.handle(IPC_CHANNELS.llm.setConfig, async (_event, config: LlmConfig) => {
+    llmConfig = { ...llmConfig, ...config };
+  });
+  ipcMain.handle(IPC_CHANNELS.llm.generate, async (_event, request: LlmRequest) => {
+    return generateLlmHints(request);
+  });
+
   ipcMain.handle(IPC_CHANNELS.scaffolds.list, async () => {
     ensureRepositories();
     if (!scaffoldRepository) {
@@ -552,6 +604,11 @@ function registerIpcHandlers() {
         ...settings,
       };
     }
+    llmConfig = {
+      ...llmConfig,
+      provider: appSettings.llmProvider ?? llmConfig.provider,
+      model: appSettings.llmModel ?? llmConfig.model,
+    };
     const activeScaffoldId = scaffoldRepository
       ? await scaffoldRepository.getActiveId()
       : appSettings.activeScaffoldId;
@@ -568,6 +625,11 @@ function registerIpcHandlers() {
       const prevAudioMode = appSettings.audioMode;
       const prevSaveTranscript = appSettings.saveTranscript;
       appSettings = { ...appSettings, ...next };
+      llmConfig = {
+        ...llmConfig,
+        provider: appSettings.llmProvider ?? llmConfig.provider,
+        model: appSettings.llmModel ?? llmConfig.model,
+      };
 
       ensureRepositories();
       if (settingsRepository) {
@@ -577,6 +639,8 @@ function registerIpcHandlers() {
           hotkey: appSettings.hotkey,
           saveTranscript: appSettings.saveTranscript,
           latencyTargetMs: appSettings.latencyTargetMs,
+          llmProvider: appSettings.llmProvider,
+          llmModel: appSettings.llmModel,
         });
       }
       if (scaffoldRepository) {

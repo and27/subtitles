@@ -19,6 +19,8 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       hotkey: data.hotkey,
       saveTranscript: data.saveTranscript,
       latencyTargetMs: data.latencyTargetMs,
+      llmProvider: data.llmProvider,
+      llmModel: data.llmModel,
     }
   }
 
@@ -38,6 +40,12 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
         }
         if (settings.latencyTargetMs) {
           data.latencyTargetMs = settings.latencyTargetMs
+        }
+        if (settings.llmProvider) {
+          data.llmProvider = settings.llmProvider
+        }
+        if (settings.llmModel) {
+          data.llmModel = settings.llmModel
         }
       },
       this.logger,
