@@ -134,6 +134,7 @@ function App() {
   const [llmMode, setLlmMode] = useState<"coaching" | "direct">("coaching");
   const sttRecorderRef = useRef<MediaRecorder | null>(null);
   const sttStreamRef = useRef<MediaStream | null>(null);
+  const sttChunksRef = useRef<Blob[]>([]);
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -256,12 +257,18 @@ function App() {
       if (recorder && recorder.state !== "inactive") {
         recorder.stop();
       }
-      if (sendFinal) {
-        window.subtitles.stt.audioChunk({
-          data: new ArrayBuffer(0),
-          mimeType: "audio/webm",
-          isFinal: true,
+      if (sendFinal && sttChunksRef.current.length > 0) {
+        const blob = new Blob(sttChunksRef.current, { type: "audio/webm" });
+        sttChunksRef.current = [];
+        blob.arrayBuffer().then((buffer) => {
+          window.subtitles.stt.audioChunk({
+            data: buffer,
+            mimeType: blob.type || "audio/webm",
+            isFinal: true,
+          });
         });
+      } else {
+        sttChunksRef.current = [];
       }
       if (sttStreamRef.current) {
         sttStreamRef.current.getTracks().forEach((track) => track.stop());
@@ -288,18 +295,13 @@ function App() {
         const recorder = new MediaRecorder(stream, {
           mimeType: "audio/webm",
         });
-        recorder.ondataavailable = async (event) => {
+        recorder.ondataavailable = (event) => {
           if (event.data.size === 0) {
             return;
           }
-          const buffer = await event.data.arrayBuffer();
-          window.subtitles.stt.audioChunk({
-            data: buffer,
-            mimeType: event.data.type || "audio/webm",
-            isFinal: false,
-          });
+          sttChunksRef.current.push(event.data);
         };
-        recorder.start(2000);
+        recorder.start();
         sttRecorderRef.current = recorder;
       })
       .catch((error) => {
@@ -613,6 +615,10 @@ function App() {
                   ? `${Math.ceil(backoffRemainingMs / 100) / 10}s`
                   : "—"}
               </strong>
+            </div>
+            <div className="metrics-row">
+              <span>STT provider</span>
+              <strong>{sttProvider === "cloud" ? "Cloud (Whisper)" : "Local"}</strong>
             </div>
             {sttStatus.lastError ? (
               <p className="field-hint">Last error: {sttStatus.lastError}</p>

@@ -134,12 +134,6 @@ let llmConfig: LlmConfig = {
 let llmMode: "coaching" | "direct" = "coaching";
 let transcriptText = "";
 let transcriptTimer: NodeJS.Timeout | null = null;
-let sttCloudQueue: Array<{
-  data: Uint8Array;
-  mimeType: string;
-  isFinal: boolean;
-}> = [];
-let sttCloudProcessing = false;
 let sttMetrics: SttMetrics = {
   totalUpdates: 0,
   lateUpdates: 0,
@@ -395,49 +389,25 @@ const transcribeWhisper = async (
   return typeof payload?.text === "string" ? payload.text.trim() : "";
 };
 
-const enqueueSttCloudChunk = (chunk: {
-  data: Uint8Array;
-  mimeType: string;
-  isFinal: boolean;
-}) => {
-  sttCloudQueue.push(chunk);
-  if (sttCloudProcessing) {
+const transcribeWhisperChunk = async (
+  data: Uint8Array,
+  mimeType: string,
+  isFinal: boolean,
+) => {
+  if (!isFinal) {
     return;
   }
-  void processSttCloudQueue();
-};
-
-const processSttCloudQueue = async () => {
-  if (sttCloudProcessing) {
-    return;
+  try {
+    const text = await transcribeWhisper(data, mimeType);
+    if (text) {
+      transcriptText = text;
+      broadcastTranscript(transcriptText, true);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Whisper request failed.";
+    registerSttFailure(message);
   }
-  sttCloudProcessing = true;
-  while (sttCloudQueue.length > 0) {
-    const item = sttCloudQueue.shift();
-    if (!item) {
-      continue;
-    }
-    if (item.isFinal && item.data.byteLength === 0) {
-      if (transcriptText.trim().length > 0) {
-        broadcastTranscript(transcriptText, true);
-      }
-      continue;
-    }
-    try {
-      const text = await transcribeWhisper(item.data, item.mimeType);
-      if (text) {
-        transcriptText = transcriptText
-          ? `${transcriptText} ${text}`.trim()
-          : text;
-        broadcastTranscript(transcriptText, item.isFinal);
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Whisper request failed.";
-      registerSttFailure(message);
-    }
-  }
-  sttCloudProcessing = false;
 };
 
 const clearTranscript = () => {
@@ -563,7 +533,6 @@ const setListening = (active: boolean, source: "hotkey" | "ui") => {
     }
   } else {
     stopAudioCapture();
-    sttCloudQueue = [];
     if (sttConfig.provider === "cloud") {
       if (transcriptText.trim().length > 0) {
         broadcastTranscript(transcriptText, true);
@@ -725,17 +694,16 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.stt.manual, (_event, text: string) => {
     injectManualTranscript(text);
   });
-  ipcMain.on(IPC_CHANNELS.stt.audioChunk, (_event, chunk: { data: ArrayBuffer; mimeType: string; isFinal: boolean }) => {
-    if (!listeningState.active || sttConfig.provider !== "cloud") {
-      return;
-    }
-    const data = new Uint8Array(chunk.data);
-    enqueueSttCloudChunk({
-      data,
-      mimeType: chunk.mimeType,
-      isFinal: chunk.isFinal,
-    });
-  });
+  ipcMain.on(
+    IPC_CHANNELS.stt.audioChunk,
+    (_event, chunk: { data: ArrayBuffer; mimeType: string; isFinal: boolean }) => {
+      if (!listeningState.active || sttConfig.provider !== "cloud") {
+        return;
+      }
+      const data = new Uint8Array(chunk.data);
+      void transcribeWhisperChunk(data, chunk.mimeType, chunk.isFinal);
+    },
+  );
   ipcMain.on(IPC_CHANNELS.stt.clear, () => {
     clearTranscript();
   });
