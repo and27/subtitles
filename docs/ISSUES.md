@@ -559,23 +559,6 @@ Permitir elegir cómo se presenta el apoyo: coaching (hints) o directa (respuest
 - En ambos modos, salida es concisa y paginada
 - Persistencia del modo entre sesiones
 
-## SUB-204 — Cognitive modes (visual safety)
-
-### Objetivo
-
-Reducir sobrecarga cognitiva con modos visuales predefinidos.
-
-### Alcance
-
-- Modos: Calm, Minimal, Focus
-- Cada modo ajusta: opacidad, tamaño, densidad (líneas visibles)
-
-### Criterios de aceptación (DoD)
-
-- Cambio de modo es instantáneo
-- Overlay responde en tiempo real
-- Persisten entre sesiones
-
 ## SUB-205 — Session history (local)
 
 ### Objetivo
