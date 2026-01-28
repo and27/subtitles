@@ -2,6 +2,7 @@ import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs/promises";
+import { Blob } from "node:buffer";
 import {
   FileScaffoldRepository,
   FileSettingsRepository,
@@ -133,6 +134,12 @@ let llmConfig: LlmConfig = {
 let llmMode: "coaching" | "direct" = "coaching";
 let transcriptText = "";
 let transcriptTimer: NodeJS.Timeout | null = null;
+let sttCloudQueue: Array<{
+  data: Uint8Array;
+  mimeType: string;
+  isFinal: boolean;
+}> = [];
+let sttCloudProcessing = false;
 let sttMetrics: SttMetrics = {
   totalUpdates: 0,
   lateUpdates: 0,
@@ -183,6 +190,11 @@ const hydrateAppSettings = async () => {
   listeningState = {
     ...listeningState,
     audioMode: appSettings.audioMode,
+  };
+  const envSttProvider = resolveEnvSttProvider();
+  sttConfig = {
+    ...sttConfig,
+    provider: envSttProvider ?? sttConfig.provider,
   };
   const envProvider = resolveEnvLlmProvider();
   const envModel = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL;
@@ -304,6 +316,21 @@ const resolveEnvLlmProvider = (): LlmProvider | null => {
   return null;
 };
 
+const resolveEnvSttProvider = (): "local" | "cloud" | null => {
+  const raw = process.env.STT_PROVIDER?.trim().toLowerCase();
+  if (raw === "local" || raw === "cloud") {
+    return raw;
+  }
+  return null;
+};
+
+const resolveSttCloudConfig = () => {
+  const apiKey = process.env.STT_CLOUD_API_KEY;
+  const model = process.env.STT_CLOUD_MODEL ?? "whisper-1";
+  const baseUrl = process.env.STT_CLOUD_BASE_URL ?? "https://api.openai.com/v1";
+  return { apiKey, model, baseUrl };
+};
+
 const resolveLlmProvider = () => {
   if (llmConfig.provider === "openai") {
     const apiKey = llmConfig.apiKey ?? process.env.OPENAI_API_KEY;
@@ -337,6 +364,80 @@ const generateLlmHints = async (request: LlmRequest): Promise<LlmResponse> => {
     updatedAt: Date.now(),
     provider: llmConfig.provider as LlmProvider,
   };
+};
+
+const transcribeWhisper = async (
+  data: Uint8Array,
+  mimeType: string,
+): Promise<string> => {
+  const { apiKey, model, baseUrl } = resolveSttCloudConfig();
+  if (!apiKey) {
+    throw new Error("STT_CLOUD_API_KEY missing.");
+  }
+  const form = new FormData();
+  const blob = new Blob([data], { type: mimeType || "audio/webm" });
+  form.append("file", blob, "audio.webm");
+  form.append("model", model);
+
+  const response = await fetch(`${baseUrl}/audio/transcriptions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: form,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Whisper error: ${response.status} ${errorText}`);
+  }
+  const payload = await response.json();
+  return typeof payload?.text === "string" ? payload.text.trim() : "";
+};
+
+const enqueueSttCloudChunk = (chunk: {
+  data: Uint8Array;
+  mimeType: string;
+  isFinal: boolean;
+}) => {
+  sttCloudQueue.push(chunk);
+  if (sttCloudProcessing) {
+    return;
+  }
+  void processSttCloudQueue();
+};
+
+const processSttCloudQueue = async () => {
+  if (sttCloudProcessing) {
+    return;
+  }
+  sttCloudProcessing = true;
+  while (sttCloudQueue.length > 0) {
+    const item = sttCloudQueue.shift();
+    if (!item) {
+      continue;
+    }
+    if (item.isFinal && item.data.byteLength === 0) {
+      if (transcriptText.trim().length > 0) {
+        broadcastTranscript(transcriptText, true);
+      }
+      continue;
+    }
+    try {
+      const text = await transcribeWhisper(item.data, item.mimeType);
+      if (text) {
+        transcriptText = transcriptText
+          ? `${transcriptText} ${text}`.trim()
+          : text;
+        broadcastTranscript(transcriptText, item.isFinal);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Whisper request failed.";
+      registerSttFailure(message);
+    }
+  }
+  sttCloudProcessing = false;
 };
 
 const clearTranscript = () => {
@@ -428,9 +529,9 @@ const canStartListening = () => {
     return false;
   }
   if (sttConfig.provider === "cloud" && !sttConfig.cloudApiKey) {
-    const cloudKey = process.env.STT_CLOUD_API_KEY;
-    if (cloudKey) {
-      sttConfig = { ...sttConfig, cloudApiKey: cloudKey };
+    const { apiKey } = resolveSttCloudConfig();
+    if (apiKey) {
+      sttConfig = { ...sttConfig, cloudApiKey: apiKey };
     } else {
       registerSttFailure("Cloud STT selected but API key is missing.");
       return false;
@@ -451,6 +552,7 @@ const setListening = (active: boolean, source: "hotkey" | "ui") => {
     }
     clearSttBackoff();
     resetSttMetrics();
+    transcriptText = "";
     overlayVisibilityBeforeListening = overlayWin?.isVisible() ?? false;
     overlayWin?.showInactive();
     const started = startAudioCapture();
@@ -461,7 +563,14 @@ const setListening = (active: boolean, source: "hotkey" | "ui") => {
     }
   } else {
     stopAudioCapture();
-    clearTranscript();
+    sttCloudQueue = [];
+    if (sttConfig.provider === "cloud") {
+      if (transcriptText.trim().length > 0) {
+        broadcastTranscript(transcriptText, true);
+      }
+    } else {
+      clearTranscript();
+    }
     if (overlayVisibilityBeforeListening === false) {
       overlayWin?.hide();
     }
@@ -616,6 +725,17 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.stt.manual, (_event, text: string) => {
     injectManualTranscript(text);
   });
+  ipcMain.on(IPC_CHANNELS.stt.audioChunk, (_event, chunk: { data: ArrayBuffer; mimeType: string; isFinal: boolean }) => {
+    if (!listeningState.active || sttConfig.provider !== "cloud") {
+      return;
+    }
+    const data = new Uint8Array(chunk.data);
+    enqueueSttCloudChunk({
+      data,
+      mimeType: chunk.mimeType,
+      isFinal: chunk.isFinal,
+    });
+  });
   ipcMain.on(IPC_CHANNELS.stt.clear, () => {
     clearTranscript();
   });
@@ -677,6 +797,11 @@ function registerIpcHandlers() {
         ...settings,
       };
     }
+    const envSttProvider = resolveEnvSttProvider();
+    sttConfig = {
+      ...sttConfig,
+      provider: envSttProvider ?? sttConfig.provider,
+    };
     const envProvider = resolveEnvLlmProvider();
     const envModel = process.env.OPENAI_MODEL ?? process.env.LLM_MODEL;
     llmConfig = {

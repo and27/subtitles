@@ -132,6 +132,8 @@ function App() {
   const [llmProvider, setLlmProvider] =
     useState<LlmProvider>(DEFAULT_LLM_PROVIDER);
   const [llmMode, setLlmMode] = useState<"coaching" | "direct">("coaching");
+  const sttRecorderRef = useRef<MediaRecorder | null>(null);
+  const sttStreamRef = useRef<MediaStream | null>(null);
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -247,6 +249,68 @@ function App() {
   useEffect(() => {
     window.subtitles.overlay.updateStyle(overlayStyle);
   }, [overlayStyle]);
+
+  useEffect(() => {
+    const stopRecorder = (sendFinal: boolean) => {
+      const recorder = sttRecorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        recorder.stop();
+      }
+      if (sendFinal) {
+        window.subtitles.stt.audioChunk({
+          data: new ArrayBuffer(0),
+          mimeType: "audio/webm",
+          isFinal: true,
+        });
+      }
+      if (sttStreamRef.current) {
+        sttStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      sttRecorderRef.current = null;
+      sttStreamRef.current = null;
+    };
+
+    if (!listeningState.active || sttProvider !== "cloud") {
+      stopRecorder(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        sttStreamRef.current = stream;
+        const recorder = new MediaRecorder(stream, {
+          mimeType: "audio/webm",
+        });
+        recorder.ondataavailable = async (event) => {
+          if (event.data.size === 0) {
+            return;
+          }
+          const buffer = await event.data.arrayBuffer();
+          window.subtitles.stt.audioChunk({
+            data: buffer,
+            mimeType: event.data.type || "audio/webm",
+            isFinal: false,
+          });
+        };
+        recorder.start(2000);
+        sttRecorderRef.current = recorder;
+      })
+      .catch((error) => {
+        console.error("[stt] failed to start microphone capture", error);
+      });
+
+    return () => {
+      cancelled = true;
+      stopRecorder(true);
+    };
+  }, [listeningState.active, sttProvider]);
 
   useEffect(() => {
     setOverlayPageIndex(0);
