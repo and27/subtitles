@@ -14,8 +14,14 @@ Incluye: **SUB-001 → SUB-008**.
 
 ## Epic 2 (10x) — Live Assist (STT + answer hints)
 
+Estado: **implementado** (SUB-101 → SUB-106 integrados).
+
+## Epic 3 (20x) — AI Assist (LLM hints + history)
+
 Estado: **en definición**.
-Alcance acordado:
+Incluye: **SUB-201 → SUB-205**.
+
+Alcance propuesto:
 
 - Windows only (por ahora)
 - Trigger por hotkey: muestra overlay + comienza a escuchar
@@ -490,7 +496,7 @@ Mantener respuesta near real-time bajo carga y con audio mixed.
 
 ---
 
-## SUB-009 — LLM Hint Engine (intent + bullets)
+## SUB-201 — LLM Hint Engine (intent + bullets)
 
 ### Objetivo
 
@@ -515,7 +521,7 @@ usando un LLM configurable por adaptadores.
 - Idioma respeta el idioma de la pregunta
 - Provider intercambiable por adapter (sin lock-in)
 
-## SUB-010 — Manual “question intake” (practice mode)
+## SUB-202 — Manual “question intake” (practice mode)
 
 ### Objetivo
 
@@ -534,7 +540,7 @@ Permitir práctica sin audio: el usuario escribe una pregunta y recibe hints.
 - Mismo resultado que si viniera del transcript
 - Overlay se actualiza en tiempo real al enviar manual
 
-## SUB-011 — Output modes (coaching vs direct)
+## SUB-203 — Output modes (coaching vs direct)
 
 ### Objetivo
 
@@ -553,7 +559,7 @@ Permitir elegir cómo se presenta el apoyo: coaching (hints) o directa (respuest
 - En ambos modos, salida es concisa y paginada
 - Persistencia del modo entre sesiones
 
-## SUB-012 — Cognitive modes (visual safety)
+## SUB-204 — Cognitive modes (visual safety)
 
 ### Objetivo
 
@@ -570,7 +576,7 @@ Reducir sobrecarga cognitiva con modos visuales predefinidos.
 - Overlay responde en tiempo real
 - Persisten entre sesiones
 
-## SUB-013 — Session history (local)
+## SUB-205 — Session history (local)
 
 ### Objetivo
 
