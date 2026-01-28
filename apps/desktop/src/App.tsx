@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { generateAnswerHints } from "core";
 import type {
   AppSettings,
@@ -126,6 +126,7 @@ function App() {
   );
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const lastOverlayContentRef = useRef("");
   const [audioMode, setAudioMode] =
     useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE);
   const [hotkey, setHotkey] = useState(DEFAULT_HOTKEY);
@@ -238,14 +239,23 @@ function App() {
     if (!activeId) {
       return;
     }
-    const content = buildOverlayText(activeDraft, transcript.text, hints);
-    window.subtitles.overlay.updateContent({ text: content });
-    const shouldShowOverlay = overlayVisible || listeningState.active;
-    if (shouldShowOverlay) {
-      window.subtitles.overlay.show();
-    } else {
+    const hasTranscript = transcript.text.trim().length > 0;
+    const isListening = listeningState.active;
+    if (!overlayVisible) {
+      window.subtitles.overlay.updateContent({ text: "" });
       window.subtitles.overlay.hide();
+      return;
     }
+    const content = hasTranscript
+      ? buildOverlayText(activeDraft, transcript.text, hints)
+      : isListening
+      ? "Listening..."
+      : lastOverlayContentRef.current || "How can I help you today?";
+    if (hasTranscript) {
+      lastOverlayContentRef.current = content;
+    }
+    window.subtitles.overlay.updateContent({ text: content });
+    window.subtitles.overlay.show();
   }, [
     activeDraft,
     activeId,
