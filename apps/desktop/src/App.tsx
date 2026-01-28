@@ -7,7 +7,9 @@ import type {
   OverlayStyle,
   Scaffold,
   SttConfig,
+  SttMetrics,
   SttProvider,
+  SttRuntimeStatus,
   SttTranscript,
 } from "../ipc/contracts";
 import "./App.css";
@@ -30,6 +32,7 @@ const DEFAULT_STYLE: OverlayStyle = {
 const DEFAULT_AUDIO_MODE: AudioCaptureMode = "system";
 const DEFAULT_HOTKEY = "CommandOrControl+Shift+Space";
 const DEFAULT_STT_PROVIDER: SttProvider = "local";
+const DEFAULT_LATENCY_TARGET_MS = 1200;
 
 const seedScaffolds: Scaffold[] = [
   {
@@ -135,6 +138,9 @@ function App() {
     useState<SttProvider>(DEFAULT_STT_PROVIDER);
   const [sttApiKey, setSttApiKey] = useState("");
   const [sttConfigLoaded, setSttConfigLoaded] = useState(false);
+  const [latencyTargetMs, setLatencyTargetMs] = useState(
+    DEFAULT_LATENCY_TARGET_MS,
+  );
   const [listeningState, setListeningState] = useState<ListeningState>({
     active: false,
     audioMode: DEFAULT_AUDIO_MODE,
@@ -145,6 +151,18 @@ function App() {
     updatedAt: 0,
   });
   const [transcriptDraft, setTranscriptDraft] = useState("");
+  const [sttMetrics, setSttMetrics] = useState<SttMetrics>({
+    totalUpdates: 0,
+    lateUpdates: 0,
+    lastUpdateAt: null,
+    lastUpdateIntervalMs: null,
+    avgUpdateIntervalMs: null,
+    dropRate: 0,
+  });
+  const [sttStatus, setSttStatus] = useState<SttRuntimeStatus>({
+    backoffUntil: null,
+    failureCount: 0,
+  });
   const [saveTranscript, setSaveTranscript] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [scaffoldsLoaded, setScaffoldsLoaded] = useState(false);
@@ -189,6 +207,9 @@ function App() {
       setAudioMode(settings.audioMode ?? DEFAULT_AUDIO_MODE);
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY);
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY);
+      setLatencyTargetMs(
+        settings.latencyTargetMs ?? DEFAULT_LATENCY_TARGET_MS,
+      );
       setSaveTranscript(settings.saveTranscript ?? false);
       setSettingsLoaded(true);
     });
@@ -196,6 +217,12 @@ function App() {
       setSttProvider(config.provider ?? DEFAULT_STT_PROVIDER);
       setSttApiKey(config.cloudApiKey ?? "");
       setSttConfigLoaded(true);
+    });
+    window.subtitles.stt.getMetrics().then((metrics) => {
+      setSttMetrics(metrics);
+    });
+    window.subtitles.stt.getStatus().then((status) => {
+      setSttStatus(status);
     });
     const unsubscribeListening = window.subtitles.onListeningState((state) => {
       setListeningState(state);
@@ -205,12 +232,20 @@ function App() {
         setTranscript(payload);
       },
     );
+    const unsubscribeMetrics = window.subtitles.onSttMetrics((metrics) => {
+      setSttMetrics(metrics);
+    });
+    const unsubscribeStatus = window.subtitles.onSttStatus((status) => {
+      setSttStatus(status);
+    });
     window.subtitles.listening.getState().then((state) => {
       setListeningState(state);
     });
     return () => {
       unsubscribeListening();
       unsubscribeTranscript();
+      unsubscribeMetrics();
+      unsubscribeStatus();
     };
   }, []);
 
@@ -331,6 +366,7 @@ function App() {
       hotkey,
       audioMode,
       saveTranscript,
+      latencyTargetMs,
       ...overrides,
     });
   };
@@ -353,6 +389,18 @@ function App() {
     setSaveTranscript(enabled);
     persistSettings({ saveTranscript: enabled });
   };
+
+  const handleLatencyTargetChange = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) {
+      return;
+    }
+    setLatencyTargetMs(value);
+    persistSettings({ latencyTargetMs: value });
+  };
+
+  const backoffRemainingMs = sttStatus.backoffUntil
+    ? Math.max(0, sttStatus.backoffUntil - Date.now())
+    : 0;
 
   const persistSttConfig = (overrides: Partial<SttConfig> = {}) => {
     if (!sttConfigLoaded) {
@@ -478,14 +526,77 @@ function App() {
             <span className="field-hint">Stored in memory for now.</span>
           </label>
           <label className="field">
-            Transcript (simulate)
+            Latency target (ms)
+            <input
+              type="number"
+              min={200}
+              max={5000}
+              step={50}
+              value={latencyTargetMs}
+              onChange={(event) =>
+                handleLatencyTargetChange(Number(event.target.value))
+              }
+            />
+            <span className="field-hint">
+              Used to flag late transcript updates.
+            </span>
+          </label>
+          <div className="field metrics-card" aria-live="polite">
+            <div className="metrics-row">
+              <span>Last interval</span>
+              <strong>
+                {sttMetrics.lastUpdateIntervalMs
+                  ? `${sttMetrics.lastUpdateIntervalMs} ms`
+                  : "—"}
+              </strong>
+            </div>
+            <div className="metrics-row">
+              <span>Avg interval</span>
+              <strong>
+                {sttMetrics.avgUpdateIntervalMs
+                  ? `${sttMetrics.avgUpdateIntervalMs} ms`
+                  : "—"}
+              </strong>
+            </div>
+            <div className="metrics-row">
+              <span>Late updates</span>
+              <strong>
+                {sttMetrics.lateUpdates}/{sttMetrics.totalUpdates}
+              </strong>
+            </div>
+            <div className="metrics-row">
+              <span>Drop rate</span>
+              <strong>{Math.round(sttMetrics.dropRate * 100)}%</strong>
+            </div>
+            <div className="metrics-row">
+              <span>Backoff</span>
+              <strong>
+                {backoffRemainingMs > 0
+                  ? `${Math.ceil(backoffRemainingMs / 100) / 10}s`
+                  : "—"}
+              </strong>
+            </div>
+            {sttStatus.lastError ? (
+              <p className="field-hint">Last error: {sttStatus.lastError}</p>
+            ) : null}
+          </div>
+          <label className="field">
+            Manual input (fallback)
             <textarea
               rows={3}
               value={transcriptDraft}
               onChange={(event) => setTranscriptDraft(event.target.value)}
-              placeholder="Paste text to simulate live captions"
+              placeholder="Type or paste a question to generate hints"
             />
             <div className="field-actions">
+              <button
+                className="ghost"
+                type="button"
+                onClick={() => window.subtitles.stt.manual(transcriptDraft)}
+                disabled={transcriptDraft.trim().length === 0}
+              >
+                Use as fallback
+              </button>
               <button
                 className="ghost"
                 type="button"
@@ -494,7 +605,7 @@ function App() {
                   !listeningState.active || transcriptDraft.trim().length === 0
                 }
               >
-                Send
+                Simulate live
               </button>
               <button
                 className="ghost"
@@ -504,6 +615,9 @@ function App() {
                 Clear
               </button>
             </div>
+            <span className="field-hint">
+              Use fallback anytime; simulate requires listening.
+            </span>
           </label>
           <label className="field">
             Save transcript (opt-in)

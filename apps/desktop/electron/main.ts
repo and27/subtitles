@@ -16,6 +16,8 @@ import {
   type AppSettings,
   type ListeningState,
   type SttConfig,
+  type SttMetrics,
+  type SttRuntimeStatus,
   type SttTranscript,
 } from "../ipc/contracts";
 
@@ -59,6 +61,7 @@ const defaultSettings: AppSettings = {
   hotkey: "CommandOrControl+Shift+Space",
   audioMode: "system",
   saveTranscript: false,
+  latencyTargetMs: 1200,
 };
 
 let appSettings: AppSettings = { ...defaultSettings };
@@ -73,6 +76,20 @@ let sttConfig: SttConfig = {
 };
 let transcriptText = "";
 let transcriptTimer: NodeJS.Timeout | null = null;
+let sttMetrics: SttMetrics = {
+  totalUpdates: 0,
+  lateUpdates: 0,
+  lastUpdateAt: null,
+  lastUpdateIntervalMs: null,
+  avgUpdateIntervalMs: null,
+  dropRate: 0,
+};
+let sttStatus: SttRuntimeStatus = {
+  backoffUntil: null,
+  failureCount: 0,
+};
+let sttIntervalSamples = 0;
+let sttTotalIntervalMs = 0;
 
 let scaffoldRepository: FileScaffoldRepository | null = null;
 let settingsRepository: FileSettingsRepository | null = null;
@@ -117,12 +134,92 @@ const broadcastListeningState = () => {
   overlayWin?.webContents.send(IPC_CHANNELS.listening.state, listeningState);
 };
 
+const broadcastSttMetrics = () => {
+  win?.webContents.send(IPC_CHANNELS.stt.metrics, sttMetrics);
+  overlayWin?.webContents.send(IPC_CHANNELS.stt.metrics, sttMetrics);
+};
+
+const broadcastSttStatus = () => {
+  win?.webContents.send(IPC_CHANNELS.stt.status, sttStatus);
+  overlayWin?.webContents.send(IPC_CHANNELS.stt.status, sttStatus);
+};
+
+const resetSttMetrics = () => {
+  sttMetrics = {
+    totalUpdates: 0,
+    lateUpdates: 0,
+    lastUpdateAt: null,
+    lastUpdateIntervalMs: null,
+    avgUpdateIntervalMs: null,
+    dropRate: 0,
+  };
+  sttIntervalSamples = 0;
+  sttTotalIntervalMs = 0;
+  broadcastSttMetrics();
+};
+
+const recordTranscriptUpdate = () => {
+  const now = Date.now();
+  const targetMs = appSettings.latencyTargetMs ?? defaultSettings.latencyTargetMs;
+  const lastUpdateAt = sttMetrics.lastUpdateAt;
+  const intervalMs = lastUpdateAt ? now - lastUpdateAt : null;
+
+  sttMetrics = {
+    ...sttMetrics,
+    totalUpdates: sttMetrics.totalUpdates + 1,
+    lastUpdateAt: now,
+    lastUpdateIntervalMs: intervalMs,
+  };
+
+  if (intervalMs !== null) {
+    sttIntervalSamples += 1;
+    sttTotalIntervalMs += intervalMs;
+    if (intervalMs > targetMs) {
+      sttMetrics.lateUpdates += 1;
+    }
+    sttMetrics.avgUpdateIntervalMs = Math.round(
+      sttTotalIntervalMs / sttIntervalSamples,
+    );
+    sttMetrics.dropRate = Number(
+      (sttMetrics.lateUpdates / sttIntervalSamples).toFixed(2),
+    );
+  }
+};
+
+const registerSttFailure = (message: string) => {
+  const now = Date.now();
+  const failureCount = sttStatus.failureCount + 1;
+  const backoffMs = Math.min(30000, 1000 * 2 ** Math.min(failureCount - 1, 5));
+  sttStatus = {
+    backoffUntil: now + backoffMs,
+    failureCount,
+    lastError: message,
+  };
+  console.warn(`[stt] ${message}`);
+  broadcastSttStatus();
+};
+
+const clearSttBackoff = () => {
+  if (!sttStatus.backoffUntil && sttStatus.failureCount === 0) {
+    return;
+  }
+  sttStatus = {
+    backoffUntil: null,
+    failureCount: 0,
+  };
+  broadcastSttStatus();
+};
+
 const broadcastTranscript = (text: string, isFinal: boolean) => {
   const payload: SttTranscript = {
     text,
     isFinal,
     updatedAt: Date.now(),
   };
+  if (text.trim().length > 0) {
+    recordTranscriptUpdate();
+    broadcastSttMetrics();
+  }
   win?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
   overlayWin?.webContents.send(IPC_CHANNELS.stt.transcript, payload);
   if (appSettings.saveTranscript && text.trim().length > 0 && isFinal) {
@@ -183,8 +280,19 @@ const simulateTranscript = (input: string) => {
   }, 140);
 };
 
+const injectManualTranscript = (input: string) => {
+  const text = input.trim();
+  if (!text) {
+    clearTranscript();
+    return;
+  }
+  transcriptText = text;
+  broadcastTranscript(transcriptText, true);
+};
+
 const startAudioCapture = () => {
   console.log(`[audio] start capture (${appSettings.audioMode})`);
+  return true;
 };
 
 const stopAudioCapture = () => {
@@ -201,15 +309,39 @@ const updateAudioMode = (mode: AudioCaptureMode) => {
   broadcastListeningState();
 };
 
+const canStartListening = () => {
+  const now = Date.now();
+  if (sttStatus.backoffUntil && now < sttStatus.backoffUntil) {
+    broadcastSttStatus();
+    return false;
+  }
+  if (sttConfig.provider === "cloud" && !sttConfig.cloudApiKey) {
+    registerSttFailure("Cloud STT selected but API key is missing.");
+    return false;
+  }
+  return true;
+};
+
 const setListening = (active: boolean, source: "hotkey" | "ui") => {
   if (listeningState.active === active) {
     return;
   }
 
   if (active) {
+    if (!canStartListening()) {
+      broadcastListeningState();
+      return;
+    }
+    clearSttBackoff();
+    resetSttMetrics();
     overlayVisibilityBeforeListening = overlayWin?.isVisible() ?? false;
     overlayWin?.showInactive();
-    startAudioCapture();
+    const started = startAudioCapture();
+    if (!started) {
+      registerSttFailure("Failed to start audio capture.");
+      broadcastListeningState();
+      return;
+    }
   } else {
     stopAudioCapture();
     clearTranscript();
@@ -364,9 +496,14 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.stt.simulate, (_event, text: string) => {
     simulateTranscript(text);
   });
+  ipcMain.on(IPC_CHANNELS.stt.manual, (_event, text: string) => {
+    injectManualTranscript(text);
+  });
   ipcMain.on(IPC_CHANNELS.stt.clear, () => {
     clearTranscript();
   });
+  ipcMain.handle(IPC_CHANNELS.stt.getMetrics, async () => sttMetrics);
+  ipcMain.handle(IPC_CHANNELS.stt.getStatus, async () => sttStatus);
   ipcMain.on(IPC_CHANNELS.transcript.clearSaved, async () => {
     await clearSavedTranscriptFile();
   });
@@ -439,6 +576,7 @@ function registerIpcHandlers() {
           audioMode: appSettings.audioMode,
           hotkey: appSettings.hotkey,
           saveTranscript: appSettings.saveTranscript,
+          latencyTargetMs: appSettings.latencyTargetMs,
         });
       }
       if (scaffoldRepository) {

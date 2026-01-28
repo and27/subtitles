@@ -19,8 +19,13 @@ export const IPC_CHANNELS = {
     getConfig: 'stt:getConfig',
     setConfig: 'stt:setConfig',
     simulate: 'stt:simulate',
+    manual: 'stt:manual',
     clear: 'stt:clear',
     transcript: 'stt:transcript',
+    getMetrics: 'stt:getMetrics',
+    metrics: 'stt:metrics',
+    getStatus: 'stt:getStatus',
+    status: 'stt:status',
   },
   transcript: {
     clearSaved: 'transcript:clearSaved',
@@ -64,6 +69,7 @@ export type AppSettings = {
   hotkey: string
   audioMode: AudioCaptureMode
   saveTranscript?: boolean
+  latencyTargetMs?: number
 }
 
 export type ListeningState = {
@@ -85,12 +91,29 @@ export type SttTranscript = {
   updatedAt: number
 }
 
+export type SttMetrics = {
+  totalUpdates: number
+  lateUpdates: number
+  lastUpdateAt: number | null
+  lastUpdateIntervalMs: number | null
+  avgUpdateIntervalMs: number | null
+  dropRate: number
+}
+
+export type SttRuntimeStatus = {
+  backoffUntil: number | null
+  failureCount: number
+  lastError?: string
+}
+
 export type Unsubscribe = () => void
 
 export type OverlayContentListener = (content: OverlayContent) => void
 export type OverlayStyleListener = (style: Partial<OverlayStyle>) => void
 export type ListeningStateListener = (state: ListeningState) => void
 export type SttTranscriptListener = (transcript: SttTranscript) => void
+export type SttMetricsListener = (metrics: SttMetrics) => void
+export type SttStatusListener = (status: SttRuntimeStatus) => void
 
 export interface SubtitlesAPI {
   overlay: {
@@ -120,7 +143,10 @@ export interface SubtitlesAPI {
     getConfig: () => Promise<SttConfig>
     setConfig: (config: SttConfig) => Promise<void>
     simulate: (text: string) => void
+    manual: (text: string) => void
     clear: () => void
+    getMetrics: () => Promise<SttMetrics>
+    getStatus: () => Promise<SttRuntimeStatus>
   }
   transcript: {
     clearSaved: () => void
@@ -129,4 +155,6 @@ export interface SubtitlesAPI {
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
   onListeningState: (listener: ListeningStateListener) => Unsubscribe
   onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
+  onSttMetrics: (listener: SttMetricsListener) => Unsubscribe
+  onSttStatus: (listener: SttStatusListener) => Unsubscribe
 }

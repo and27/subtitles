@@ -15,6 +15,7 @@ const createDefaultStore = (): StoreData => ({
   audioMode: 'system',
   hotkey: 'CommandOrControl+Shift+Space',
   saveTranscript: false,
+  latencyTargetMs: 1200,
 })
 
 const storeQueue = new Map<string, Promise<unknown>>()
