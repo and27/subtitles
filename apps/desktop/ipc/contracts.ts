@@ -77,6 +77,7 @@ export type AppSettings = {
   latencyTargetMs?: number
   llmProvider?: LlmProvider
   llmModel?: string
+  llmMode?: LlmMode
 }
 
 export type ListeningState = {

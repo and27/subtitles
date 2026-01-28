@@ -35,6 +35,10 @@ export class LocalLlmProvider implements LlmProviderPort {
       return { text: '' }
     }
     const intent = classifyIntent(trimmed)
+    if (request.mode === 'direct') {
+      const summary = summarize(trimmed)
+      return { text: `Answer: ${summary}` }
+    }
     const summary = summarize(trimmed)
     const hints = intentHints(intent).slice(0, request.maxHints ?? 3)
     const text = [`Summary: ${summary}`, ...hints.map((hint) => `- ${hint}`)].join('\n')

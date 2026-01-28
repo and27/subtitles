@@ -18,17 +18,27 @@ export class OpenAiLlmProvider implements LlmProviderPort {
   }
 
   async generateHints(request: LlmHintRequest): Promise<LlmHintResponse> {
-    const prompt = [
-      "You are a concise interview coach.",
-      "Return a short summary and 1-3 bullet hints.",
-      "Max 7 lines total.",
-      "Use the same language as the question.",
-      "Format exactly:",
-      "Summary: <one short line>",
-      "- bullet 1 (eg.)",
-      "- bullet 2 (eg.)",
-      "- bullet 3 (optional)",
-    ].join("\n");
+    const prompt =
+      request.mode === "direct"
+        ? [
+            "You are a concise interview coach.",
+            "Return a direct answer, not hints.",
+            "Max 7 lines total.",
+            "Use the same language as the question.",
+            "Format exactly:",
+            "Answer: <short answer>",
+          ].join("\n")
+        : [
+            "You are a concise interview coach.",
+            "Return a short summary and 1-3 bullet hints.",
+            "Max 7 lines total.",
+            "Use the same language as the question.",
+            "Format exactly:",
+            "Summary: <one short line>",
+            "- bullet 1 (eg.)",
+            "- bullet 2 (eg.)",
+            "- bullet 3 (optional)",
+          ].join("\n");
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",

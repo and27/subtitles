@@ -18,6 +18,7 @@ const createDefaultStore = (): StoreData => ({
   latencyTargetMs: 1200,
   llmProvider: 'local',
   llmModel: 'gpt-4o-mini',
+  llmMode: 'coaching',
 })
 
 const storeQueue = new Map<string, Promise<unknown>>()
