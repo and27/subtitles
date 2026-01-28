@@ -203,6 +203,7 @@ function App() {
       setHotkey(settings.hotkey ?? DEFAULT_HOTKEY);
       setHotkeyDraft(settings.hotkey ?? DEFAULT_HOTKEY);
       setSaveTranscript(settings.saveTranscript ?? false);
+      setLlmMode(settings.llmMode ?? "coaching");
       setSettingsLoaded(true);
     });
     window.subtitles.stt.getConfig().then((config) => {
