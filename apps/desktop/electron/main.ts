@@ -123,6 +123,10 @@ const OVERLAY_NUDGE_UP =
   process.env.OVERLAY_NUDGE_UP || "CommandOrControl+Alt+Up";
 const OVERLAY_NUDGE_DOWN =
   process.env.OVERLAY_NUDGE_DOWN || "CommandOrControl+Alt+Down";
+const OVERLAY_PAGE_PREV =
+  process.env.OVERLAY_PAGE_PREV || "CommandOrControl+Alt+Left";
+const OVERLAY_PAGE_NEXT =
+  process.env.OVERLAY_PAGE_NEXT || "CommandOrControl+Alt+Right";
 
 let appSettings: AppSettings = { ...defaultSettings };
 let listeningState: ListeningState = {
@@ -241,7 +245,6 @@ const nudgeOverlayPosition = async (delta: number) => {
   if (settingsRepository) {
     await settingsRepository.save({
       overlayStyle: appSettings.overlayStyle,
-      overlayPosition: appSettings.overlayPosition,
       audioMode: appSettings.audioMode,
       hotkey: appSettings.hotkey,
       saveTranscript: appSettings.saveTranscript,
@@ -632,6 +635,21 @@ const registerOverlayNudgeHotkeys = () => {
   }
 };
 
+const registerOverlayPageHotkeys = () => {
+  const prevOk = globalShortcut.register(OVERLAY_PAGE_PREV, () => {
+    win?.webContents.send(IPC_CHANNELS.overlay.pagePrev);
+  });
+  if (!prevOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_PAGE_PREV}`);
+  }
+  const nextOk = globalShortcut.register(OVERLAY_PAGE_NEXT, () => {
+    win?.webContents.send(IPC_CHANNELS.overlay.pageNext);
+  });
+  if (!nextOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_PAGE_NEXT}`);
+  }
+};
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
@@ -714,13 +732,18 @@ function registerIpcHandlers() {
   );
   ipcMain.on(
     IPC_CHANNELS.overlay.updateStyle,
-    (_event, style: Partial<OverlayStyle>) => {
+    (event, style: Partial<OverlayStyle>) => {
       appSettings = {
         ...appSettings,
         overlayStyle: { ...appSettings.overlayStyle, ...style },
       };
-      overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style);
-      win?.webContents.send(IPC_CHANNELS.overlay.style, style);
+      const senderId = event.sender.id;
+      if (overlayWin && overlayWin.webContents.id !== senderId) {
+        overlayWin.webContents.send(IPC_CHANNELS.overlay.style, style);
+      }
+      if (win && win.webContents.id !== senderId) {
+        win.webContents.send(IPC_CHANNELS.overlay.style, style);
+      }
     },
   );
   ipcMain.on(
@@ -924,6 +947,7 @@ app.whenReady().then(async () => {
   createOverlayWindow();
   registerGlobalHotkey();
   registerOverlayNudgeHotkeys();
+  registerOverlayPageHotkeys();
 });
 
 app.on("will-quit", () => {
