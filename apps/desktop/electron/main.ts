@@ -107,6 +107,7 @@ const defaultOverlayStyle: OverlayStyle = {
 
 const defaultSettings: AppSettings = {
   overlayStyle: defaultOverlayStyle,
+  overlayMaxLines: 7,
   activeScaffoldId: null,
   hotkey: "CommandOrControl+Shift+Space",
   audioMode: "system",
@@ -864,6 +865,7 @@ function registerIpcHandlers() {
       if (settingsRepository) {
         await settingsRepository.save({
           overlayStyle: appSettings.overlayStyle,
+          overlayMaxLines: appSettings.overlayMaxLines,
           audioMode: appSettings.audioMode,
           hotkey: appSettings.hotkey,
           saveTranscript: appSettings.saveTranscript,

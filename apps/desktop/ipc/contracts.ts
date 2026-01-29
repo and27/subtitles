@@ -71,6 +71,7 @@ export type Scaffold = {
 
 export type AppSettings = {
   overlayStyle: OverlayStyle
+  overlayMaxLines?: number
   activeScaffoldId: string | null
   hotkey: string
   audioMode: AudioCaptureMode

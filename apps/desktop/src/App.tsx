@@ -86,7 +86,7 @@ const fromDraft = (draft: ScaffoldDraft): Scaffold => ({
 const scaffoldTitle = (scaffold: Scaffold) =>
   scaffold.triggers[0] ?? scaffold.tags?.[0] ?? "Untitled scaffold";
 
-const OVERLAY_PAGE_LINES = 7;
+const DEFAULT_OVERLAY_MAX_LINES = 7;
 
 const paginateLines = (text: string, maxLines: number): string[] => {
   const lines = text.split(/\r?\n/);
@@ -119,6 +119,9 @@ function App() {
         }),
   );
   const [overlayStyle, setOverlayStyle] = useState<OverlayStyle>(DEFAULT_STYLE);
+  const [overlayMaxLines, setOverlayMaxLines] = useState(
+    DEFAULT_OVERLAY_MAX_LINES,
+  );
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [audioMode, setAudioMode] =
     useState<AudioCaptureMode>(DEFAULT_AUDIO_MODE);
@@ -165,8 +168,8 @@ function App() {
   const activeDraft = useMemo(() => fromDraft(draft), [draft]);
   const llmText = llmOutput?.text ?? "";
   const overlayPages = useMemo(
-    () => paginateLines(llmText, OVERLAY_PAGE_LINES),
-    [llmText],
+    () => paginateLines(llmText, overlayMaxLines),
+    [llmText, overlayMaxLines],
   );
   const [overlayPageIndex, setOverlayPageIndex] = useState(0);
 
@@ -191,6 +194,9 @@ function App() {
     });
     window.subtitles.settings.load().then((settings) => {
       setOverlayStyle(settings.overlayStyle);
+      setOverlayMaxLines(
+        settings.overlayMaxLines ?? DEFAULT_OVERLAY_MAX_LINES,
+      );
       if (settings.activeScaffoldId) {
         setStoredActiveId(settings.activeScaffoldId);
         if (
@@ -458,12 +464,19 @@ function App() {
     setOverlayStyle((prev) => ({ ...prev, ...patch }));
   };
 
+  const handleOverlayMaxLinesChange = (value: number) => {
+    const next = Math.max(3, Math.min(12, value));
+    setOverlayMaxLines(next);
+    persistSettings({ overlayMaxLines: next });
+  };
+
   const persistSettings = (overrides: Partial<AppSettings> = {}) => {
     if (!settingsLoaded) {
       return;
     }
     window.subtitles.settings.save({
       overlayStyle,
+      overlayMaxLines,
       activeScaffoldId: activeId || null,
       hotkey,
       audioMode,
@@ -932,6 +945,21 @@ function App() {
             <span className="field-hint">
               Hotkeys: Ctrl+Alt+Up / Ctrl+Alt+Down
             </span>
+          </div>
+
+          <div className="style-control">
+            <label htmlFor="overlayMaxLines">Max lines</label>
+            <input
+              id="overlayMaxLines"
+              type="range"
+              min={3}
+              max={12}
+              value={overlayMaxLines}
+              onChange={(event) =>
+                handleOverlayMaxLinesChange(Number(event.target.value))
+              }
+            />
+            <span>{overlayMaxLines} lines</span>
           </div>
         </section>
       </main>
