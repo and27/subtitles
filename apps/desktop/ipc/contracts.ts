@@ -9,6 +9,7 @@ export const IPC_CHANNELS = {
     style: 'overlay:style',
     pageNext: 'overlay:pageNext',
     pagePrev: 'overlay:pagePrev',
+    maxLines: 'overlay:maxLines',
   },
   listening: {
     start: 'listening:start',
@@ -150,6 +151,7 @@ export type Unsubscribe = () => void
 export type OverlayContentListener = (content: OverlayContent) => void
 export type OverlayStyleListener = (style: Partial<OverlayStyle>) => void
 export type OverlayPageListener = () => void
+export type OverlayMaxLinesListener = (value: number) => void
 export type ListeningStateListener = (state: ListeningState) => void
 export type SttTranscriptListener = (transcript: SttTranscript) => void
 export type SttMetricsListener = (metrics: SttMetrics) => void
@@ -201,6 +203,7 @@ export interface SubtitlesAPI {
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
   onOverlayPageNext: (listener: OverlayPageListener) => Unsubscribe
   onOverlayPagePrev: (listener: OverlayPageListener) => Unsubscribe
+  onOverlayMaxLines: (listener: OverlayMaxLinesListener) => Unsubscribe
   onListeningState: (listener: ListeningStateListener) => Unsubscribe
   onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
   onSttMetrics: (listener: SttMetricsListener) => Unsubscribe

@@ -267,6 +267,16 @@ function App() {
   }, [overlayStyle]);
 
   useEffect(() => {
+    const unsubscribeMaxLines = window.subtitles.onOverlayMaxLines((value) => {
+      const next = Math.max(3, Math.min(12, value));
+      setOverlayMaxLines(next);
+    });
+    return () => {
+      unsubscribeMaxLines();
+    };
+  }, []);
+
+  useEffect(() => {
     const flushFinalUpload = () => {
       if (sttChunksRef.current.length === 0) {
         return;
@@ -983,6 +993,9 @@ function App() {
               }
             />
             <span>{overlayMaxLines} lines</span>
+            <span className="field-hint">
+              Hotkeys: Ctrl+Alt+F9 / Ctrl+Alt+F10
+            </span>
           </div>
 
           <div className="style-control">
