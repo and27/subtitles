@@ -337,15 +337,28 @@ function App() {
   }, [listeningState.active, sttProvider]);
 
   useEffect(() => {
-    setOverlayPageIndex(0);
+    setOverlayPageIndex((prev) =>
+      Math.min(prev, Math.max(overlayPages.length - 1, 0)),
+    );
+  }, [overlayPages.length]);
+
+  useEffect(() => {
     if (overlayPages.length <= 1) {
       return;
     }
-    const timer = window.setInterval(() => {
-      setOverlayPageIndex((prev) => (prev + 1) % overlayPages.length);
-    }, 4000);
-    return () => window.clearInterval(timer);
-  }, [overlayPages.length, llmText]);
+    const unsubscribePageNext = window.subtitles.onOverlayPageNext(() => {
+      setOverlayPageIndex((prev) =>
+        Math.min(prev + 1, overlayPages.length - 1),
+      );
+    });
+    const unsubscribePagePrev = window.subtitles.onOverlayPagePrev(() => {
+      setOverlayPageIndex((prev) => Math.max(prev - 1, 0));
+    });
+    return () => {
+      unsubscribePageNext();
+      unsubscribePagePrev();
+    };
+  }, [overlayPages.length]);
 
   useEffect(() => {
     if (!settingsLoaded || !scaffoldsLoaded) {
@@ -456,6 +469,16 @@ function App() {
 
   const handleStyleChange = (patch: Partial<OverlayStyle>) => {
     setOverlayStyle((prev) => ({ ...prev, ...patch }));
+  };
+
+  const handleOverlayPagePrev = () => {
+    setOverlayPageIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleOverlayPageNext = () => {
+    setOverlayPageIndex((prev) =>
+      Math.min(prev + 1, Math.max(overlayPages.length - 1, 0)),
+    );
   };
 
   const persistSettings = (overrides: Partial<AppSettings> = {}) => {
@@ -931,6 +954,37 @@ function App() {
             <span>{Math.round(overlayStyle.positionY * 100)}%</span>
             <span className="field-hint">
               Hotkeys: Ctrl+Alt+Up / Ctrl+Alt+Down
+            </span>
+          </div>
+
+          <div className="style-control">
+            <label>Overlay page</label>
+            <div className="page-controls">
+              <button
+                className="ghost"
+                type="button"
+                onClick={handleOverlayPagePrev}
+                disabled={overlayPages.length <= 1 || overlayPageIndex === 0}
+              >
+                Prev
+              </button>
+              <span>
+                Page {overlayPageIndex + 1} / {overlayPages.length}
+              </span>
+              <button
+                className="ghost"
+                type="button"
+                onClick={handleOverlayPageNext}
+                disabled={
+                  overlayPages.length <= 1 ||
+                  overlayPageIndex >= overlayPages.length - 1
+                }
+              >
+                Next
+              </button>
+            </div>
+            <span className="field-hint">
+              Hotkeys: Ctrl+Alt+Left / Ctrl+Alt+Right
             </span>
           </div>
         </section>

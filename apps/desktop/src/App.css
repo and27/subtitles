@@ -273,6 +273,17 @@
   color: var(--muted);
 }
 
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-controls span {
+  flex: 1;
+  text-align: center;
+}
+
 button {
   border: none;
   font-family: var(--font-body);
