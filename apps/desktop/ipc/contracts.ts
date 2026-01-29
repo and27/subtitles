@@ -7,6 +7,8 @@ export const IPC_CHANNELS = {
     setClickThrough: 'overlay:setClickThrough',
     content: 'overlay:content',
     style: 'overlay:style',
+    pageNext: 'overlay:pageNext',
+    pagePrev: 'overlay:pagePrev',
   },
   listening: {
     start: 'listening:start',
@@ -146,6 +148,7 @@ export type Unsubscribe = () => void
 
 export type OverlayContentListener = (content: OverlayContent) => void
 export type OverlayStyleListener = (style: Partial<OverlayStyle>) => void
+export type OverlayPageListener = () => void
 export type ListeningStateListener = (state: ListeningState) => void
 export type SttTranscriptListener = (transcript: SttTranscript) => void
 export type SttMetricsListener = (metrics: SttMetrics) => void
@@ -195,6 +198,8 @@ export interface SubtitlesAPI {
   }
   onOverlayContent: (listener: OverlayContentListener) => Unsubscribe
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
+  onOverlayPageNext: (listener: OverlayPageListener) => Unsubscribe
+  onOverlayPagePrev: (listener: OverlayPageListener) => Unsubscribe
   onListeningState: (listener: ListeningStateListener) => Unsubscribe
   onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
   onSttMetrics: (listener: SttMetricsListener) => Unsubscribe

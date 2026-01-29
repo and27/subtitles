@@ -86,6 +86,16 @@ const subtitles: SubtitlesAPI = {
     ipcRenderer.on(IPC_CHANNELS.overlay.style, handler);
     return () => ipcRenderer.off(IPC_CHANNELS.overlay.style, handler);
   },
+  onOverlayPageNext: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC_CHANNELS.overlay.pageNext, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.pageNext, handler);
+  },
+  onOverlayPagePrev: (listener) => {
+    const handler = () => listener();
+    ipcRenderer.on(IPC_CHANNELS.overlay.pagePrev, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.pagePrev, handler);
+  },
   onListeningState: (listener) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
