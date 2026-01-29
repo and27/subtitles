@@ -927,6 +927,9 @@ function App() {
               }
             />
             <span>{Math.round(overlayStyle.opacity * 100)}%</span>
+            <span className="field-hint">
+              Hotkeys: Ctrl+Alt+F8 / Ctrl+Alt+F7
+            </span>
           </div>
 
           <div className="style-control">
@@ -942,6 +945,9 @@ function App() {
               }
             />
             <span>{overlayStyle.fontSize}px</span>
+            <span className="field-hint">
+              Hotkeys: Ctrl+Alt+F11 / Ctrl+Alt+F12
+            </span>
           </div>
 
           <div className="style-control">

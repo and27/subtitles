@@ -135,6 +135,22 @@ const OVERLAY_MAX_LINES_DOWN =
   process.env.OVERLAY_MAX_LINES_DOWN || "CommandOrControl+Alt+F10";
 const OVERLAY_MAX_LINES_MIN = 3;
 const OVERLAY_MAX_LINES_MAX = 12;
+const OVERLAY_FONT_STEP =
+  Number(process.env.OVERLAY_FONT_STEP) || 1;
+const OVERLAY_FONT_UP =
+  process.env.OVERLAY_FONT_UP || "CommandOrControl+Alt+F11";
+const OVERLAY_FONT_DOWN =
+  process.env.OVERLAY_FONT_DOWN || "CommandOrControl+Alt+F12";
+const OVERLAY_FONT_MIN = 16;
+const OVERLAY_FONT_MAX = 48;
+const OVERLAY_OPACITY_STEP =
+  Number(process.env.OVERLAY_OPACITY_STEP) || 0.05;
+const OVERLAY_OPACITY_UP =
+  process.env.OVERLAY_OPACITY_UP || "CommandOrControl+Alt+F8";
+const OVERLAY_OPACITY_DOWN =
+  process.env.OVERLAY_OPACITY_DOWN || "CommandOrControl+Alt+F7";
+const OVERLAY_OPACITY_MIN = 0.2;
+const OVERLAY_OPACITY_MAX = 1;
 
 let appSettings: AppSettings = { ...defaultSettings };
 let listeningState: ListeningState = {
@@ -279,6 +295,63 @@ const updateOverlayMaxLines = async (delta: number) => {
     overlayMaxLines: next,
   };
   win?.webContents.send(IPC_CHANNELS.overlay.maxLines, next);
+  ensureRepositories();
+  if (settingsRepository) {
+    await settingsRepository.save({
+      overlayStyle: appSettings.overlayStyle,
+      overlayMaxLines: appSettings.overlayMaxLines,
+      audioMode: appSettings.audioMode,
+      hotkey: appSettings.hotkey,
+      saveTranscript: appSettings.saveTranscript,
+      latencyTargetMs: appSettings.latencyTargetMs,
+      llmProvider: appSettings.llmProvider,
+      llmModel: appSettings.llmModel,
+      llmMode: appSettings.llmMode,
+    });
+  }
+};
+
+const updateOverlayFontSize = async (delta: number) => {
+  const current = appSettings.overlayStyle.fontSize ?? defaultOverlayStyle.fontSize;
+  const next = clamp(current + delta, OVERLAY_FONT_MIN, OVERLAY_FONT_MAX);
+  if (next === current) {
+    return;
+  }
+  appSettings = {
+    ...appSettings,
+    overlayStyle: { ...appSettings.overlayStyle, fontSize: next },
+  };
+  overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, { fontSize: next });
+  win?.webContents.send(IPC_CHANNELS.overlay.style, { fontSize: next });
+  ensureRepositories();
+  if (settingsRepository) {
+    await settingsRepository.save({
+      overlayStyle: appSettings.overlayStyle,
+      overlayMaxLines: appSettings.overlayMaxLines,
+      audioMode: appSettings.audioMode,
+      hotkey: appSettings.hotkey,
+      saveTranscript: appSettings.saveTranscript,
+      latencyTargetMs: appSettings.latencyTargetMs,
+      llmProvider: appSettings.llmProvider,
+      llmModel: appSettings.llmModel,
+      llmMode: appSettings.llmMode,
+    });
+  }
+};
+
+const updateOverlayOpacity = async (delta: number) => {
+  const current = appSettings.overlayStyle.opacity ?? defaultOverlayStyle.opacity;
+  const nextRaw = current + delta;
+  const next = Math.round(clamp(nextRaw, OVERLAY_OPACITY_MIN, OVERLAY_OPACITY_MAX) * 100) / 100;
+  if (next === current) {
+    return;
+  }
+  appSettings = {
+    ...appSettings,
+    overlayStyle: { ...appSettings.overlayStyle, opacity: next },
+  };
+  overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, { opacity: next });
+  win?.webContents.send(IPC_CHANNELS.overlay.style, { opacity: next });
   ensureRepositories();
   if (settingsRepository) {
     await settingsRepository.save({
@@ -704,6 +777,33 @@ const registerOverlayMaxLinesHotkeys = () => {
   }
 };
 
+const registerOverlayFontOpacityHotkeys = () => {
+  const fontUpOk = globalShortcut.register(OVERLAY_FONT_UP, () => {
+    void updateOverlayFontSize(OVERLAY_FONT_STEP);
+  });
+  if (!fontUpOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_FONT_UP}`);
+  }
+  const fontDownOk = globalShortcut.register(OVERLAY_FONT_DOWN, () => {
+    void updateOverlayFontSize(-OVERLAY_FONT_STEP);
+  });
+  if (!fontDownOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_FONT_DOWN}`);
+  }
+  const opacityUpOk = globalShortcut.register(OVERLAY_OPACITY_UP, () => {
+    void updateOverlayOpacity(OVERLAY_OPACITY_STEP);
+  });
+  if (!opacityUpOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_OPACITY_UP}`);
+  }
+  const opacityDownOk = globalShortcut.register(OVERLAY_OPACITY_DOWN, () => {
+    void updateOverlayOpacity(-OVERLAY_OPACITY_STEP);
+  });
+  if (!opacityDownOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_OPACITY_DOWN}`);
+  }
+};
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
@@ -1003,6 +1103,7 @@ app.whenReady().then(async () => {
   registerOverlayNudgeHotkeys();
   registerOverlayPageHotkeys();
   registerOverlayMaxLinesHotkeys();
+  registerOverlayFontOpacityHotkeys();
 });
 
 app.on("will-quit", () => {
