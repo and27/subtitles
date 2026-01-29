@@ -234,6 +234,9 @@ function App() {
     const unsubscribeStatus = window.subtitles.onSttStatus((status) => {
       setSttStatus(status);
     });
+    const unsubscribeDragMode = window.subtitles.onOverlayDragMode((enabled) => {
+      setOverlayDragMode(enabled);
+    });
     window.subtitles.listening.getState().then((state) => {
       setListeningState(state);
     });
@@ -242,6 +245,7 @@ function App() {
       unsubscribeTranscript();
       unsubscribeMetrics();
       unsubscribeStatus();
+      unsubscribeDragMode();
     };
   }, []);
 

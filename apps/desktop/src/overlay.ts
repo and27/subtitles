@@ -131,6 +131,12 @@ root.addEventListener('pointerdown', handlePointerDown)
 root.addEventListener('pointermove', handlePointerMove)
 root.addEventListener('pointerup', handlePointerUp)
 root.addEventListener('pointerleave', handlePointerUp)
+root.addEventListener('dblclick', () => {
+  if (!dragEnabled) {
+    return
+  }
+  window.subtitles.overlay.setDragMode(false)
+})
 
 window.subtitles.onListeningState((state) => {
   renderListeningState(state.active)

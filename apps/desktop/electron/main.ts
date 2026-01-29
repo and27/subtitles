@@ -700,8 +700,7 @@ function registerIpcHandlers() {
   ipcMain.on(IPC_CHANNELS.overlay.setDragMode, (_event, enabled: boolean) => {
     overlayDragMode = enabled;
     if (enabled) {
-      // Keep click-through while allowing overlay to receive pointer events.
-      overlayWin?.setIgnoreMouseEvents(true, { forward: true });
+      overlayWin?.setIgnoreMouseEvents(false);
     } else {
       overlayWin?.setIgnoreMouseEvents(overlayClickThrough, { forward: true });
     }
