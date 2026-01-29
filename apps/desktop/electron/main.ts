@@ -130,9 +130,9 @@ const OVERLAY_PAGE_NEXT =
 const OVERLAY_MAX_LINES_STEP =
   Number(process.env.OVERLAY_MAX_LINES_STEP) || 1;
 const OVERLAY_MAX_LINES_UP =
-  process.env.OVERLAY_MAX_LINES_UP || "CommandOrControl+Alt+M";
+  process.env.OVERLAY_MAX_LINES_UP || "CommandOrControl+Alt+F9";
 const OVERLAY_MAX_LINES_DOWN =
-  process.env.OVERLAY_MAX_LINES_DOWN || "CommandOrControl+Alt+N";
+  process.env.OVERLAY_MAX_LINES_DOWN || "CommandOrControl+Alt+F10";
 const OVERLAY_MAX_LINES_MIN = 3;
 const OVERLAY_MAX_LINES_MAX = 12;
 

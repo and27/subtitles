@@ -994,7 +994,7 @@ function App() {
             />
             <span>{overlayMaxLines} lines</span>
             <span className="field-hint">
-              Hotkeys: Ctrl+Alt+M / Ctrl+Alt+N
+              Hotkeys: Ctrl+Alt+F9 / Ctrl+Alt+F10
             </span>
           </div>
 
