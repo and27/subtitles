@@ -15,6 +15,7 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
     const data = await loadStore(this.filePath, this.logger)
     return {
       overlayStyle: data.overlayStyle,
+      overlayMaxLines: data.overlayMaxLines,
       audioMode: data.audioMode,
       hotkey: data.hotkey,
       saveTranscript: data.saveTranscript,
@@ -30,6 +31,9 @@ export class FileSettingsRepository implements SettingsRepositoryPort {
       this.filePath,
       (data) => {
         data.overlayStyle = settings.overlayStyle
+        if (settings.overlayMaxLines !== undefined) {
+          data.overlayMaxLines = settings.overlayMaxLines
+        }
         if (settings.audioMode) {
           data.audioMode = settings.audioMode
         }

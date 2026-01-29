@@ -4,6 +4,7 @@ export type AudioCaptureMode = 'mic' | 'system' | 'mixed'
 
 export type AppSettings = {
   overlayStyle: OverlayStyle
+  overlayMaxLines?: number
   audioMode?: AudioCaptureMode
   hotkey?: string
   saveTranscript?: boolean
