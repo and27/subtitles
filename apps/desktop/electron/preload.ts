@@ -14,6 +14,7 @@ import {
   type LlmConfig,
   type LlmRequest,
   type SubtitlesAPI,
+  type HistoryEntry,
 } from "../ipc/contracts";
 
 const subtitles: SubtitlesAPI = {
@@ -49,6 +50,10 @@ const subtitles: SubtitlesAPI = {
   },
   transcript: {
     clearSaved: () => ipcRenderer.send(IPC_CHANNELS.transcript.clearSaved),
+  },
+  history: {
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.history.list),
+    clear: () => ipcRenderer.invoke(IPC_CHANNELS.history.clear),
   },
   stt: {
     getConfig: () => ipcRenderer.invoke(IPC_CHANNELS.stt.getConfig),
@@ -131,6 +136,14 @@ const subtitles: SubtitlesAPI = {
     ) => listener(status);
     ipcRenderer.on(IPC_CHANNELS.stt.status, handler);
     return () => ipcRenderer.off(IPC_CHANNELS.stt.status, handler);
+  },
+  onHistoryEntry: (listener) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      entry: HistoryEntry,
+    ) => listener(entry);
+    ipcRenderer.on(IPC_CHANNELS.history.added, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.history.added, handler);
   },
 };
 

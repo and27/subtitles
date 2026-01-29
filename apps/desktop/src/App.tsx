@@ -11,6 +11,7 @@ import type {
   SttTranscript,
   LlmProvider,
   LlmResponse,
+  HistoryEntry,
 } from "../ipc/contracts";
 import "./App.css";
 
@@ -148,6 +149,7 @@ function App() {
   const [transcriptDraft, setTranscriptDraft] = useState("");
   const [llmOutput, setLlmOutput] = useState<LlmResponse | null>(null);
   const lastLlmQuestionRef = useRef("");
+  const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
   const [sttMetrics, setSttMetrics] = useState<SttMetrics>({
     totalUpdates: 0,
     lateUpdates: 0,
@@ -225,6 +227,9 @@ function App() {
     window.subtitles.stt.getStatus().then((status) => {
       setSttStatus(status);
     });
+    window.subtitles.history.list().then((items) => {
+      setHistoryEntries(items);
+    });
     const unsubscribeListening = window.subtitles.onListeningState((state) => {
       setListeningState(state);
     });
@@ -250,6 +255,9 @@ function App() {
     const unsubscribeStatus = window.subtitles.onSttStatus((status) => {
       setSttStatus(status);
     });
+    const unsubscribeHistory = window.subtitles.onHistoryEntry((entry) => {
+      setHistoryEntries((prev) => [entry, ...prev]);
+    });
     window.subtitles.listening.getState().then((state) => {
       setListeningState(state);
     });
@@ -259,6 +267,7 @@ function App() {
       unsubscribeOverlayStyle();
       unsubscribeMetrics();
       unsubscribeStatus();
+      unsubscribeHistory();
     };
   }, []);
 
@@ -564,6 +573,14 @@ function App() {
     setLlmMode(mode);
     persistSettings({ llmMode: mode });
   };
+
+  const handleClearHistory = async () => {
+    await window.subtitles.history.clear();
+    setHistoryEntries([]);
+  };
+
+  const formatTimestamp = (value: number) =>
+    new Date(value).toLocaleString();
 
   return (
     <div className="app-shell">
@@ -906,6 +923,38 @@ function App() {
               </button>
             </div>
           </form>
+        </section>
+
+        <section className="panel history-panel">
+          <div className="panel-header">
+            <h2>Session history</h2>
+            <p>Saved questions and hints (local only).</p>
+          </div>
+          <div className="history-actions">
+            <button
+              className="ghost"
+              type="button"
+              onClick={handleClearHistory}
+              disabled={historyEntries.length === 0}
+            >
+              Delete all
+            </button>
+          </div>
+          <div className="history-list">
+            {historyEntries.length === 0 ? (
+              <p className="field-hint">No history yet.</p>
+            ) : (
+              historyEntries.map((entry) => (
+                <div className="history-item" key={entry.id}>
+                  <span className="history-meta">
+                    {formatTimestamp(entry.createdAt)}
+                  </span>
+                  <p className="history-question">{entry.question}</p>
+                  <p className="history-response">{entry.response}</p>
+                </div>
+              ))
+            )}
+          </div>
         </section>
 
         <section className="panel style-panel">

@@ -259,6 +259,50 @@
   gap: 12px;
 }
 
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-item {
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  background: var(--surface-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.history-question {
+  font-weight: 600;
+  margin: 0;
+}
+
+.history-response {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .style-control {
   display: grid;
   grid-template-columns: 1fr;
