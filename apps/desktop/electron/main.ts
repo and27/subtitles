@@ -116,6 +116,13 @@ const defaultSettings: AppSettings = {
   llmModel: "gpt-4o-mini",
 };
 
+const OVERLAY_NUDGE_STEP =
+  Number(process.env.OVERLAY_NUDGE_STEP) || 0.05;
+const OVERLAY_NUDGE_UP =
+  process.env.OVERLAY_NUDGE_UP || "CommandOrControl+Alt+Up";
+const OVERLAY_NUDGE_DOWN =
+  process.env.OVERLAY_NUDGE_DOWN || "CommandOrControl+Alt+Down";
+
 let appSettings: AppSettings = { ...defaultSettings };
 let listeningState: ListeningState = {
   active: false,
@@ -212,6 +219,37 @@ const broadcastSttMetrics = () => {
 const broadcastSttStatus = () => {
   win?.webContents.send(IPC_CHANNELS.stt.status, sttStatus);
   overlayWin?.webContents.send(IPC_CHANNELS.stt.status, sttStatus);
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const nudgeOverlayPosition = async (delta: number) => {
+  const current = appSettings.overlayStyle.positionY ?? defaultOverlayStyle.positionY;
+  const next = clamp(current + delta, 0, 1);
+  if (next === current) {
+    return;
+  }
+  appSettings = {
+    ...appSettings,
+    overlayStyle: { ...appSettings.overlayStyle, positionY: next },
+  };
+  overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, { positionY: next });
+  win?.webContents.send(IPC_CHANNELS.overlay.style, { positionY: next });
+  ensureRepositories();
+  if (settingsRepository) {
+    await settingsRepository.save({
+      overlayStyle: appSettings.overlayStyle,
+      overlayPosition: appSettings.overlayPosition,
+      audioMode: appSettings.audioMode,
+      hotkey: appSettings.hotkey,
+      saveTranscript: appSettings.saveTranscript,
+      latencyTargetMs: appSettings.latencyTargetMs,
+      llmProvider: appSettings.llmProvider,
+      llmModel: appSettings.llmModel,
+      llmMode: appSettings.llmMode,
+    });
+  }
 };
 
 const resetSttMetrics = () => {
@@ -578,6 +616,21 @@ const registerGlobalHotkey = () => {
   registeredHotkey = appSettings.hotkey;
 };
 
+const registerOverlayNudgeHotkeys = () => {
+  const upOk = globalShortcut.register(OVERLAY_NUDGE_UP, () => {
+    void nudgeOverlayPosition(-OVERLAY_NUDGE_STEP);
+  });
+  if (!upOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_NUDGE_UP}`);
+  }
+  const downOk = globalShortcut.register(OVERLAY_NUDGE_DOWN, () => {
+    void nudgeOverlayPosition(OVERLAY_NUDGE_STEP);
+  });
+  if (!downOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_NUDGE_DOWN}`);
+  }
+};
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
@@ -666,6 +719,7 @@ function registerIpcHandlers() {
         overlayStyle: { ...appSettings.overlayStyle, ...style },
       };
       overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style);
+      win?.webContents.send(IPC_CHANNELS.overlay.style, style);
     },
   );
   ipcMain.on(
@@ -867,6 +921,7 @@ app.whenReady().then(async () => {
   createWindow();
   createOverlayWindow();
   registerGlobalHotkey();
+  registerOverlayNudgeHotkeys();
 });
 
 app.on("will-quit", () => {
