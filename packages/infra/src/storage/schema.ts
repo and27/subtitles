@@ -17,11 +17,20 @@ const scaffoldSchema = z.object({
   tags: z.array(z.string()).optional(),
 })
 
+const historyItemSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  response: z.string(),
+  createdAt: z.number(),
+})
+
 export const storeSchema = z.object({
   schemaVersion: z.number(),
   scaffolds: z.array(scaffoldSchema),
   activeScaffoldId: z.string().nullable(),
+  history: z.array(historyItemSchema).default([]),
   overlayStyle: overlayStyleSchema,
+  overlayMaxLines: z.number().default(7),
   audioMode: audioModeSchema,
   hotkey: z.string().default('CommandOrControl+Shift+Space'),
   saveTranscript: z.boolean().default(false),

@@ -39,6 +39,11 @@ export const IPC_CHANNELS = {
   transcript: {
     clearSaved: 'transcript:clearSaved',
   },
+  history: {
+    list: 'history:list',
+    clear: 'history:clear',
+    added: 'history:added',
+  },
   scaffolds: {
     list: 'scaffolds:list',
     upsert: 'scaffolds:upsert',
@@ -131,6 +136,13 @@ export type LlmResponse = {
   provider: LlmProvider
 }
 
+export type HistoryEntry = {
+  id: string
+  question: string
+  response: string
+  createdAt: number
+}
+
 export type SttMetrics = {
   totalUpdates: number
   lateUpdates: number
@@ -156,6 +168,7 @@ export type ListeningStateListener = (state: ListeningState) => void
 export type SttTranscriptListener = (transcript: SttTranscript) => void
 export type SttMetricsListener = (metrics: SttMetrics) => void
 export type SttStatusListener = (status: SttRuntimeStatus) => void
+export type HistoryEntryListener = (entry: HistoryEntry) => void
 
 export interface SubtitlesAPI {
   overlay: {
@@ -199,6 +212,10 @@ export interface SubtitlesAPI {
   transcript: {
     clearSaved: () => void
   }
+  history: {
+    list: () => Promise<HistoryEntry[]>
+    clear: () => Promise<void>
+  }
   onOverlayContent: (listener: OverlayContentListener) => Unsubscribe
   onOverlayStyle: (listener: OverlayStyleListener) => Unsubscribe
   onOverlayPageNext: (listener: OverlayPageListener) => Unsubscribe
@@ -208,4 +225,5 @@ export interface SubtitlesAPI {
   onSttTranscript: (listener: SttTranscriptListener) => Unsubscribe
   onSttMetrics: (listener: SttMetricsListener) => Unsubscribe
   onSttStatus: (listener: SttStatusListener) => Unsubscribe
+  onHistoryEntry: (listener: HistoryEntryListener) => Unsubscribe
 }

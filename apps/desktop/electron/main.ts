@@ -2,9 +2,11 @@ import { app, BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
 import {
   FileScaffoldRepository,
   FileSettingsRepository,
+  FileHistoryRepository,
   LocalLlmProvider,
   OpenAiLlmProvider,
   type StoreLogger,
@@ -25,6 +27,7 @@ import {
   type LlmRequest,
   type LlmResponse,
   type LlmProvider,
+  type HistoryEntry,
 } from "../ipc/contracts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -170,6 +173,7 @@ let sttTotalIntervalMs = 0;
 
 let scaffoldRepository: FileScaffoldRepository | null = null;
 let settingsRepository: FileSettingsRepository | null = null;
+let historyRepository: FileHistoryRepository | null = null;
 
 const storeLogger: StoreLogger = {
   warn: (message: string) => {
@@ -183,10 +187,11 @@ const getTranscriptPath = () =>
   path.join(app.getPath("userData"), "subtitles-transcript.txt");
 
 const ensureRepositories = () => {
-  if (!scaffoldRepository || !settingsRepository) {
+  if (!scaffoldRepository || !settingsRepository || !historyRepository) {
     const storePath = getStorePath();
     scaffoldRepository = new FileScaffoldRepository(storePath, storeLogger);
     settingsRepository = new FileSettingsRepository(storePath, storeLogger);
+    historyRepository = new FileHistoryRepository(storePath, storeLogger);
   }
 };
 
@@ -433,6 +438,21 @@ const generateLlmHints = async (request: LlmRequest): Promise<LlmResponse> => {
     mode: request.mode ?? llmMode,
     maxHints: 3,
   });
+  const trimmedQuestion = request.question.trim();
+  const trimmedResponse = response.text.trim();
+  if (trimmedQuestion && trimmedResponse) {
+    const entry: HistoryEntry = {
+      id: crypto.randomUUID?.() ?? `history-${Date.now()}`,
+      question: trimmedQuestion,
+      response: trimmedResponse,
+      createdAt: Date.now(),
+    };
+    ensureRepositories();
+    if (historyRepository) {
+      await historyRepository.add(entry);
+      win?.webContents.send(IPC_CHANNELS.history.added, entry);
+    }
+  }
   return {
     text: response.text,
     updatedAt: Date.now(),
@@ -846,6 +866,20 @@ function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.stt.getStatus, async () => sttStatus);
   ipcMain.on(IPC_CHANNELS.transcript.clearSaved, async () => {
     await clearSavedTranscriptFile();
+  });
+  ipcMain.handle(IPC_CHANNELS.history.list, async () => {
+    ensureRepositories();
+    if (!historyRepository) {
+      return [] as HistoryEntry[];
+    }
+    return historyRepository.list();
+  });
+  ipcMain.handle(IPC_CHANNELS.history.clear, async () => {
+    ensureRepositories();
+    if (!historyRepository) {
+      return;
+    }
+    await historyRepository.clear();
   });
 
   ipcMain.handle(IPC_CHANNELS.llm.getConfig, async () => llmConfig);
