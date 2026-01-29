@@ -240,7 +240,6 @@ const nudgeOverlayPosition = async (delta: number) => {
   if (settingsRepository) {
     await settingsRepository.save({
       overlayStyle: appSettings.overlayStyle,
-      overlayPosition: appSettings.overlayPosition,
       audioMode: appSettings.audioMode,
       hotkey: appSettings.hotkey,
       saveTranscript: appSettings.saveTranscript,
@@ -713,13 +712,18 @@ function registerIpcHandlers() {
   );
   ipcMain.on(
     IPC_CHANNELS.overlay.updateStyle,
-    (_event, style: Partial<OverlayStyle>) => {
+    (event, style: Partial<OverlayStyle>) => {
       appSettings = {
         ...appSettings,
         overlayStyle: { ...appSettings.overlayStyle, ...style },
       };
-      overlayWin?.webContents.send(IPC_CHANNELS.overlay.style, style);
-      win?.webContents.send(IPC_CHANNELS.overlay.style, style);
+      const senderId = event.sender.id;
+      if (overlayWin && overlayWin.webContents.id !== senderId) {
+        overlayWin.webContents.send(IPC_CHANNELS.overlay.style, style);
+      }
+      if (win && win.webContents.id !== senderId) {
+        win.webContents.send(IPC_CHANNELS.overlay.style, style);
+      }
     },
   );
   ipcMain.on(
