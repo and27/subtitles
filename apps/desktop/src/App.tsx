@@ -227,6 +227,17 @@ function App() {
         setTranscript(payload);
       },
     );
+    const unsubscribeOverlayStyle = window.subtitles.onOverlayStyle((style) => {
+      setOverlayStyle((prev) => {
+        const next = { ...prev, ...style };
+        const same =
+          next.opacity === prev.opacity &&
+          next.fontSize === prev.fontSize &&
+          next.lineHeight === prev.lineHeight &&
+          next.positionY === prev.positionY;
+        return same ? prev : next;
+      });
+    });
     const unsubscribeMetrics = window.subtitles.onSttMetrics((metrics) => {
       setSttMetrics(metrics);
     });
@@ -239,6 +250,7 @@ function App() {
     return () => {
       unsubscribeListening();
       unsubscribeTranscript();
+      unsubscribeOverlayStyle();
       unsubscribeMetrics();
       unsubscribeStatus();
     };
@@ -917,6 +929,9 @@ function App() {
               }
             />
             <span>{Math.round(overlayStyle.positionY * 100)}%</span>
+            <span className="field-hint">
+              Hotkeys: Ctrl+Alt+Up / Ctrl+Alt+Down
+            </span>
           </div>
         </section>
       </main>
