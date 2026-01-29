@@ -96,6 +96,12 @@ const subtitles: SubtitlesAPI = {
     ipcRenderer.on(IPC_CHANNELS.overlay.pagePrev, handler);
     return () => ipcRenderer.off(IPC_CHANNELS.overlay.pagePrev, handler);
   },
+  onOverlayMaxLines: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, value: number) =>
+      listener(value);
+    ipcRenderer.on(IPC_CHANNELS.overlay.maxLines, handler);
+    return () => ipcRenderer.off(IPC_CHANNELS.overlay.maxLines, handler);
+  },
   onListeningState: (listener) => {
     const handler = (
       _event: Electron.IpcRendererEvent,

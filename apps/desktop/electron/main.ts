@@ -127,6 +127,14 @@ const OVERLAY_PAGE_PREV =
   process.env.OVERLAY_PAGE_PREV || "CommandOrControl+Alt+Left";
 const OVERLAY_PAGE_NEXT =
   process.env.OVERLAY_PAGE_NEXT || "CommandOrControl+Alt+Right";
+const OVERLAY_MAX_LINES_STEP =
+  Number(process.env.OVERLAY_MAX_LINES_STEP) || 1;
+const OVERLAY_MAX_LINES_UP =
+  process.env.OVERLAY_MAX_LINES_UP || "CommandOrControl+Alt+PageUp";
+const OVERLAY_MAX_LINES_DOWN =
+  process.env.OVERLAY_MAX_LINES_DOWN || "CommandOrControl+Alt+PageDown";
+const OVERLAY_MAX_LINES_MIN = 3;
+const OVERLAY_MAX_LINES_MAX = 12;
 
 let appSettings: AppSettings = { ...defaultSettings };
 let listeningState: ListeningState = {
@@ -245,6 +253,37 @@ const nudgeOverlayPosition = async (delta: number) => {
   if (settingsRepository) {
     await settingsRepository.save({
       overlayStyle: appSettings.overlayStyle,
+      audioMode: appSettings.audioMode,
+      hotkey: appSettings.hotkey,
+      saveTranscript: appSettings.saveTranscript,
+      latencyTargetMs: appSettings.latencyTargetMs,
+      llmProvider: appSettings.llmProvider,
+      llmModel: appSettings.llmModel,
+      llmMode: appSettings.llmMode,
+    });
+  }
+};
+
+const updateOverlayMaxLines = async (delta: number) => {
+  const current = appSettings.overlayMaxLines ?? 7;
+  const next = clamp(
+    current + delta,
+    OVERLAY_MAX_LINES_MIN,
+    OVERLAY_MAX_LINES_MAX,
+  );
+  if (next === current) {
+    return;
+  }
+  appSettings = {
+    ...appSettings,
+    overlayMaxLines: next,
+  };
+  win?.webContents.send(IPC_CHANNELS.overlay.maxLines, next);
+  ensureRepositories();
+  if (settingsRepository) {
+    await settingsRepository.save({
+      overlayStyle: appSettings.overlayStyle,
+      overlayMaxLines: appSettings.overlayMaxLines,
       audioMode: appSettings.audioMode,
       hotkey: appSettings.hotkey,
       saveTranscript: appSettings.saveTranscript,
@@ -650,6 +689,21 @@ const registerOverlayPageHotkeys = () => {
   }
 };
 
+const registerOverlayMaxLinesHotkeys = () => {
+  const upOk = globalShortcut.register(OVERLAY_MAX_LINES_UP, () => {
+    void updateOverlayMaxLines(OVERLAY_MAX_LINES_STEP);
+  });
+  if (!upOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_MAX_LINES_UP}`);
+  }
+  const downOk = globalShortcut.register(OVERLAY_MAX_LINES_DOWN, () => {
+    void updateOverlayMaxLines(-OVERLAY_MAX_LINES_STEP);
+  });
+  if (!downOk) {
+    console.warn(`[hotkey] failed to register: ${OVERLAY_MAX_LINES_DOWN}`);
+  }
+};
+
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, "electron-vite.svg"),
@@ -948,6 +1002,7 @@ app.whenReady().then(async () => {
   registerGlobalHotkey();
   registerOverlayNudgeHotkeys();
   registerOverlayPageHotkeys();
+  registerOverlayMaxLinesHotkeys();
 });
 
 app.on("will-quit", () => {
